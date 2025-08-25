@@ -1,7 +1,5 @@
 package com.example.demo.fileService;
-
 public class FileResponse {
-
 	private String filename;
 	private String fileDownloadUri;
 	private String fileType;
@@ -37,7 +35,4 @@ public class FileResponse {
 	public void setSize(long size) {
 		this.size = size;
 	}
-	
-	
-	
 }

@@ -1,14 +1,7 @@
 package com.example.demo.fileService;
-
-import javax.servlet.ServletContext;
-
+import jakarta.servlet.ServletContext;
 import org.springframework.http.MediaType;
-
-
 public class MediaTypeUtils {
-	
-	
-	
 	 public static MediaType getMediaTypeForFileName(ServletContext servletContext, String fileName) {
 	        // application/pdf
 	        // application/xml
@@ -21,5 +14,4 @@ public class MediaTypeUtils {
 	            return MediaType.APPLICATION_OCTET_STREAM;
 	        }
 	    }
-
 }

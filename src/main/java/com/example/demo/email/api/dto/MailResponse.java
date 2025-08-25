@@ -1,24 +1,13 @@
 package com.example.demo.email.api.dto;
-
-import lombok.AllArgsConstructor;
-import lombok.Data;
-import lombok.NoArgsConstructor;
-
-@Data
-@AllArgsConstructor
-@NoArgsConstructor
 public class MailResponse {
-	
 	private String message;
 	private boolean status;
-	
 //	public MailResponse() {
 //		super();
 //		this.message = message;
 //		this.status = status;
 //	}
 //	
-	
 	public String getMessage() {
 		return message;
 	}
@@ -31,8 +20,4 @@ public class MailResponse {
 	public void setStatus(boolean status) {
 		this.status = status;
 	}
-	
-	
-	
-
 }
