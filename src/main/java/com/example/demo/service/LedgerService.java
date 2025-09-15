@@ -1,990 +1,636 @@
 package com.example.demo.service;
-import java.util.Iterator;
-import java.util.List;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.stereotype.Service;
+
 import com.example.demo.model.Account_group_v3;
 import com.example.demo.model.Account_ledger_v3;
 import com.example.demo.model.Account_transactions_v3;
 import com.example.demo.repository.GroupServiceRepo;
 import com.example.demo.repository.LedgerServiceRepo;
 import com.example.demo.repository.TransactionServiceRepo;
-//import org.json.simple.JSONArray;
-//import org.json.simple.JSONObject;
-import org.json.JSONObject;
-import org.json.JSONArray;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.stereotype.Service;
+
+import java.util.Iterator;
+import java.util.List;
+
+/**
+ * Readability-first refactor:
+ * - Constructor injection
+ * - SLF4J logging
+ * - Small helpers for safe parsing and group-name resolution
+ * - Non-breaking: public APIs and field-encoding of totals/values are preserved
+ */
 @Service
 public class LedgerService {
-	@Autowired
-	private LedgerServiceRepo ledgerServiceRepo;
-	@Autowired
-	private GroupServiceRepo groupServiceRepo;
-	@Autowired
-	private TransactionServiceRepo transactionServiceRepo;
-	public Account_ledger_v3 add_Ledgers(Account_ledger_v3 fp) {
-		return ledgerServiceRepo.save(fp);
-	}
-	public List<Account_ledger_v3> last_idSearchs()  {
-		List<Account_ledger_v3> li=(List<Account_ledger_v3>) ledgerServiceRepo.last_id_Search();
-		return li;
-	}
-	public List<Account_ledger_v3> ledger_name_searchs(String ledgerName)  {
-		System.out.println(ledgerName);
-		List<Account_ledger_v3> li=(List<Account_ledger_v3>) ledgerServiceRepo.ledger_name_search(ledgerName);
-		return li;
-	}
-	public List<Account_ledger_v3> list_ledgers()  {
-		List<Account_ledger_v3> li=(List<Account_ledger_v3>) ledgerServiceRepo.selectData();
-		Iterator<Account_ledger_v3> it = li.iterator(); 
-	    while (it.hasNext()) { 
-	    	Account_ledger_v3 ob = it.next(); 
-	    	System.out.println(ob.getAc_group());
-	    	String grpName = (String) groupServiceRepo.selectGroup(ob.getAc_group());
-	    	System.out.println(grpName);
-	    	ob.setAc_group(grpName);
-//	    	ob.setAc_title(acTitle);
-//	    	
-//	    	String acType = (String) acTypeRepo.selectType(ob.getAc_type());
-//	    	
-//	    	ob.setAc_type(acType);
-	    }
-		return li;
-	}
-public List<Account_ledger_v3> ledger_sorts(String field, String type)  {
-		System.out.println(field+' '+type);
-		List<Account_ledger_v3> li = null;
-		if(field.equals("ledger_name")&&type.equals("ASC"))
-		{
-			 li=(List<Account_ledger_v3>) ledgerServiceRepo.ledger_nameA();
-		}
-		if(field.equals("ledger_name")&&type.equals("DESC"))
-		{
-			 li=(List<Account_ledger_v3>) ledgerServiceRepo.ledger_nameD();
-		}
-		if(field.equals("ac_group")&&type.equals("ASC"))
-		{
-			 li=(List<Account_ledger_v3>) ledgerServiceRepo.ac_groupA();
-		}
-		if(field.equals("ac_group")&&type.equals("DESC"))
-		{
-			 li=(List<Account_ledger_v3>) ledgerServiceRepo.ac_groupD();
-		}
-		if(field.equals("open_balance")&&type.equals("ASC"))
-		{
-			 li=(List<Account_ledger_v3>) ledgerServiceRepo.open_balanceA();
-			 System.out.println("open balance asc");
-		}
-		if(field.equals("open_balance")&&type.equals("DESC"))
-		{
-			 li=(List<Account_ledger_v3>) ledgerServiceRepo.open_balanceD();
-			 System.out.println("open balance desc");
-		}
-		if(field.equals("mobile")&&type.equals("ASC"))
-		{
-			 li=(List<Account_ledger_v3>) ledgerServiceRepo.mobileA();
-		}
-		if(field.equals("mobile")&&type.equals("DESC"))
-		{
-			 li=(List<Account_ledger_v3>) ledgerServiceRepo.mobileD();
-		}
-		if(field.equals("email")&&type.equals("ASC"))
-		{
-			 li=(List<Account_ledger_v3>) ledgerServiceRepo.emailA();
-		}
-		if(field.equals("email")&&type.equals("DESC"))
-		{
-			 li=(List<Account_ledger_v3>) ledgerServiceRepo.emailD();
-		}
-		if(field.equals("bank")&&type.equals("ASC"))
-		{
-			 li=(List<Account_ledger_v3>) ledgerServiceRepo.bankA();
-		}
-		if(field.equals("bank")&&type.equals("DESC"))
-		{
-			 li=(List<Account_ledger_v3>) ledgerServiceRepo.bankD();
-		}
-		Iterator<Account_ledger_v3> it = li.iterator(); 
-	    while (it.hasNext()) { 
-	    	Account_ledger_v3 ob = it.next(); 
-	    	System.out.println(ob.getAc_group());
-	    	String grpName = (String) groupServiceRepo.selectGroup(ob.getAc_group());
-	    	System.out.println(grpName);
-	    	ob.setAc_group(grpName);
-	    }
-		return li;
+
+    private static final Logger log = LoggerFactory.getLogger(LedgerService.class);
+
+    private final LedgerServiceRepo ledgerServiceRepo;
+    private final GroupServiceRepo groupServiceRepo;
+    private final TransactionServiceRepo transactionServiceRepo;
+
+    public LedgerService(LedgerServiceRepo ledgerServiceRepo,
+                         GroupServiceRepo groupServiceRepo,
+                         TransactionServiceRepo transactionServiceRepo) {
+        this.ledgerServiceRepo = ledgerServiceRepo;
+        this.groupServiceRepo = groupServiceRepo;
+        this.transactionServiceRepo = transactionServiceRepo;
     }
-    public List<Account_ledger_v3> ledger_bn_dates(String start, String end)  {
-	System.out.println("start"+start+"end"+end);
-	List<Account_ledger_v3> li=(List<Account_ledger_v3>) ledgerServiceRepo.selectDataBnDate(start,end);
-	Iterator<Account_ledger_v3> it = li.iterator(); 
-    while (it.hasNext()) { 
-    	Account_ledger_v3 ob = it.next(); 
-    	System.out.println(ob.getAc_group());
-    	String grpName = (String) groupServiceRepo.selectGroup(ob.getAc_group());
-    	System.out.println(grpName);
-    	ob.setAc_group(grpName);
-          }
-    return li;
-   }
-	public String ledger_deletes(int id) {
-		ledgerServiceRepo.deleteById(id);
-//		transactionServiceRepo.transactionDelete(id);
-		// TODO Auto-generated method stub
-		return "Deleted successfully";
-	}
-	public List<Account_ledger_v3> ledger_Searchs(int ledgerId)  {
-		System.out.println(ledgerId);
-		List<Account_ledger_v3> li=(List<Account_ledger_v3>) ledgerServiceRepo.ledger_Search(ledgerId);
-		return li;
-	}
-    public List<Account_ledger_v3> bank_names()  {
-		List<Account_ledger_v3> li=(List<Account_ledger_v3>) ledgerServiceRepo.selectBank();
-		return li;
-     }
-    public List<Account_ledger_v3> ledger_Searchs2(int ledgerId)  {
-		System.out.println(ledgerId);
-		List<Account_ledger_v3> li=(List<Account_ledger_v3>) ledgerServiceRepo.ledger_Search2(ledgerId);
-		return li;
-	}
-    public List<Account_transactions_v3> account_statementDatas(int ledgerId)  {
- 		System.out.println(ledgerId);
- 		String ledger_id=Integer.toString(ledgerId);
- 		List<Account_ledger_v3> li=(List<Account_ledger_v3>) ledgerServiceRepo.ledger_Search2(ledgerId);
- 		System.out.println(li.size());
- 		Double cur_amount,cur_balance1 = (double) 0 , debit_total1 = (double) 0 ,credit_total1 =(double) 0 ;
- 		String  balance_type = null , description = "ledger creation" ,particularname=null,created_date=null,tran_description=null;
- 		Double  Amount=(double)0,tran_open_balance=(double)0;
- 	    Integer particular=0;
- 	    Double   balance=(double)0;
- 		for (int i = 0; i < li.size(); i++)   
- 		{  
- 			System.out.println(li.get(i).getAc_group());
- 			balance_type=li.get(i).getBalance_type();
- 			 if (balance_type.equals("debit")) {
- 			    if(li.get(i).getOpen_balance().equals(""))
- 	 	 	      {
- 			    	 debit_total1 +=(double) 0;
- 	 	 	      }
- 	 	 	      else
- 	 	 	      {
- 	 	          debit_total1 += Double.parseDouble(li.get(i).getOpen_balance());   
- 	 	 	      }
- 	 	        }
- 	 	        if (balance_type.equals("credit")){
- 	 	          if(li.get(i).getOpen_balance().equals(""))
- 	 	 	      {
- 	 	        	credit_total1 +=(double) 0;
- 	 	 	      }
- 	 	 	      else
- 	 	 	      {
- 	 	          credit_total1 += Double.parseDouble(li.get(i).getOpen_balance()); 
- 	 	 	      }
- 	 	        }
- 	 	      System.out.println(debit_total1+"  "+credit_total1);
- 	 	      if(li.get(i).getOpen_balance().equals(""))
- 	 	      {
- 	 	    	tran_open_balance=(double) 0;
- 	 	      }
- 	 	      else
- 	 	      {
- 	 	        tran_open_balance=Double.parseDouble(li.get(i).getOpen_balance());
- 	 	      }
- 		}
- 		 System.out.println(" balance_type  "+balance_type);
- 		 JSONObject jsonObject = new JSONObject();
- 	      //Inserting key-value pairs into the json object
-// 	      jsonObject.put("ID", "1");
-// 	      jsonObject.put("First_Name", "Krishna Kasyap");
-// 	      jsonObject.put("Last_Name", "Bhagavatula");
-// 	      jsonObject.put("Date_Of_Birth", "1989-09-26");
-// 	      jsonObject.put("Place_Of_Birth", "Vishakhapatnam");
-// 	      jsonObject.put("Country", "25000");
- 	      //Creating a json array
- 	      JSONArray array = new JSONArray();
-// 	      array.add("e-mail: krishna_kasyap@gmail.com");
- 	      //Adding array to the json object
- 	     cur_balance1=cur_balance1+tran_open_balance;
-List<Account_transactions_v3> li1=(List<Account_transactions_v3>) transactionServiceRepo.selectAccStmtTransaction2(ledgerId,description);
-//Iterator<Account_transactions_v3> it = li1.iterator(); 
-//while (it.hasNext()) { 
-//	
-//	Account_transactions_v3 ob = it.next(); 
-//	
-//	System.out.println("fgdfgdf"+ob.getType());
-//	
-//}
- String flag=null;
-System.out.println(li1.size());
-if(li1.size()>0)
-{
-	List<Account_transactions_v3> filteredList =(List<Account_transactions_v3>) transactionServiceRepo.transactionFilter(ledgerId,description);;
-	System.out.println("filteredList count "+  filteredList.size());
-	if(filteredList.size()>1)
-	{
-	    int lastId=filteredList.size()-1;
-	    System.out.println("filteredList last id "+  filteredList.get(lastId).getTranID());
-//		int tempId=filteredList.get(lastId).getTranID();
-		filteredList.remove(lastId);
-		li1.addAll(filteredList);
-	}
-//	for (int j = 0; j < li1.size(); j++)   
-//	{ 
-//		int f=0;
-//	
-//		if(li1.get(j).getDescription().equals("ledger creation"))
-//		{
-//			f=f+1;
-//		}
-//		
-//		
-//	}
-for (int i = 0; i < li1.size(); i++)   
-	{ 
-	 if (li1.get(i).getDbt_ac().equals( ledger_id)) {
-   	  particular = Integer.parseInt(li1.get(i).getCrdt_ac());
-     }
-     if (li1.get(i).getCrdt_ac().equals(ledger_id)) {
-   	  particular = Integer.parseInt(li1.get(i).getDbt_ac());
-     }
-    particularname= ledgerServiceRepo.ac_ledger_SearchName(particular);
-    System.out.println("particularname  "+ particularname);
-//    System.out.println("balance_type  "+ balance_type);
-//	balance_type=li1.get(i).get
-	   Amount =Double.parseDouble(li1.get(i).getAmount()) ;
-//	   System.out.println("Amount  "+ Amount);
-//	   System.out.println("Dbt_ac  "+ li1.get(i).getDbt_ac());
-//	   
-//	   System.out.println("Crdt_ac  "+ li1.get(i).getCrdt_ac());
-                   if (li1.get(i).getDbt_ac().equals( ledger_id)) {
-	   	                if (balance_type.equals("debit")) {
-	   	                  cur_balance1 =
-	   	                  cur_balance1 + Amount;
-	   	                } else if (balance_type.equals("credit")) {
-	   	                  cur_balance1 =
-	   	                    cur_balance1 - Amount;
-	   	                }
-	   	                debit_total1 =
-	   	                  debit_total1 + Amount;
-	   	                flag="debit";
-	   	              }
-                   if (li1.get(i).getCrdt_ac().equals(ledger_id)) {
-   	                if (balance_type.equals("debit")) {
-   	                  cur_balance1 =
-  	                   cur_balance1 - Amount;
-   	                } else if (balance_type.equals("credit")) {
-    	                  cur_balance1 =
-    	                    cur_balance1 + Amount;
-    	             }
-   	                credit_total1 =
-    	                 credit_total1 + Amount;
-   	             flag="credit";
-   	               }
-                   created_date=li1.get(i).getCreatedDate();
-                   tran_description=li1.get(i).getDescription();
-                   System.out.println("cur_balance1  "+ cur_balance1);
-                   array.put("e-mail:"+cur_balance1);
-                   array.put("particularname "+particularname);
-                   array.put("flag "+flag);
-//                   cur_balance1=(float) 0;
-//                   Amount=(float) 0;
-                   li1.get(i).setFilename(particularname);
-       			li1.get(i).setAmount(Double.toString(Amount));
-       			li1.get(i).setCreatedDate(created_date);
-       			li1.get(i).setDescription(tran_description);
-       		li1.get(i).setBank(Double.toString(cur_balance1));
-       		li1.get(i).setBranch(flag);
-           }
-li1.get(0).setChq_no(Double.toString( debit_total1));
-li1.get(0).setChq_date(Double.toString( credit_total1));
-if(debit_total1==0&&credit_total1!=0)
-{
-	 balance=credit_total1; 
-}
-if(debit_total1!=0&&credit_total1==0)
-{
-	 balance=debit_total1;  
-}
-if(debit_total1!=0&&credit_total1!=0)
-{
-	balance=debit_total1-credit_total1;
-}
-li1.get(0).setCreatedTime(Double.toString( balance));
-      System.out.println("debit_total1  "+ debit_total1+"  "+credit_total1);
-      jsonObject.put("contact",array);
-      System.out.println("array  "+ array);
-}	
- 		return li1;
-    }
-    public List<Account_ledger_v3> profit_losss(String title)  {
-    	double directIncomeAmount=(double) 0;
-List<Account_ledger_v3> li=(List<Account_ledger_v3>) ledgerServiceRepo.profit_loss(title);
- 		System.out.println(li.size());
- 		if(li.size()>0)
- 		{
- 		for (int i = 0; i < li.size(); i++)   
- 			{ 
- 			if(!li.get(i).getAmount().equals("0")&&!li.get(i).getAmount().equals(""))
- 			{
- 				directIncomeAmount=(double) (directIncomeAmount+Double.parseDouble(li.get(i).getAmount()));
- 			}
- 		}
-    	li.get(0).setBranch(Double.toString(directIncomeAmount));
- 		System.out.println("directIncomeAmount  "+directIncomeAmount);
-    }
- 		return li;
-    }
-    public List<Account_ledger_v3> profit_loss_bn_dates(String title, String start, String end)  {
-    	double directIncomeAmount=(double) 0;
-    	int ledgerId;
-    	double ledgerTotalAmount=(double) 0;
-    	List<Account_ledger_v3> li=(List<Account_ledger_v3>) ledgerServiceRepo.profit_loss_idSearchByTitle(title);
-    	 		System.out.println("acTitle "+title+" size "+ li.size());
-    	 		if(li.size()>0)
-    	 		{
-    	 		for (int i = 0; i < li.size(); i++)   
-    	 			{ 
-    	 			ledgerTotalAmount=(double) 0;
-    	 			ledgerId=li.get(i).getId();
-    	 			List<Account_transactions_v3> li1=(List<Account_transactions_v3>) transactionServiceRepo.profit_loss_bn_date(ledgerId,start,end);
-    	 			System.out.println("transaction "+ledgerId+" size "+ li1.size());
-    		 		if(li1.size()>0)
-        	 		{
-        	 		for (int j = 0; j < li1.size(); j++)   
-        	 			{ 
-    	 		    directIncomeAmount=(double) (directIncomeAmount+Float.parseFloat(li1.get(j).getAmount()));
-    	 		    ledgerTotalAmount=(double) (ledgerTotalAmount+Float.parseFloat(li1.get(j).getAmount()));
-        	 			}
-        	 		}
-    	 			li.get(i).setAmount(Double.toString(ledgerTotalAmount));
-    	 		}
-    	    	li.get(0).setBranch(Double.toString(directIncomeAmount));
-    	 		System.out.println("directIncomeAmount  "+directIncomeAmount);
-    	    }
-    	return li;
-    }
-    public List<Account_transactions_v3> account_statementDataBnDates(int ledgerId,String start, String end)  {
- 		System.out.println(ledgerId);
- 		String ledger_id=Integer.toString(ledgerId);
- 		List<Account_ledger_v3> li=(List<Account_ledger_v3>) ledgerServiceRepo.ledger_Search2(ledgerId);
- 		System.out.println(li.size());
- 		Double cur_amount,cur_balance1 = (double) 0 , debit_total1 = (double) 0 ,credit_total1 =(double) 0 ;
- 		String  balance_type = null , description = "ledger creation" ,particularname=null,created_date=null,tran_description=null;
- 		Double  Amount=(double)0,tran_open_balance=(double)0;
- 	    Integer particular=0;
- 	    Double   balance=(double)0;
- 		for (int i = 0; i < li.size(); i++)   
- 		{  
- 			System.out.println(li.get(i).getAc_group());
- 			balance_type=li.get(i).getBalance_type();
- 			 if (balance_type.equals("debit")) {
- 				   if(li.get(i).getOpen_balance().equals(""))
-  	 	 	      {
- 					debit_total1 +=(double) 0;
-  	 	 	      }
-  	 	 	      else
-  	 	 	      {
- 	 	          debit_total1 += Double.parseDouble(li.get(i).getOpen_balance());
-  	 	 	      }
- 	 	        }
- 	 	        if (balance_type.equals("credit")){
- 	 	          if(li.get(i).getOpen_balance().equals(""))
- 	 	 	      {
- 	 	        	credit_total1 +=(double) 0;
- 	 	 	      }
- 	 	 	      else
- 	 	 	      {
- 	 	          credit_total1 += Double.parseDouble(li.get(i).getOpen_balance()); 
- 	 	 	      }
- 	 	        }
- 	 	      System.out.println(debit_total1+"  "+credit_total1);
- 	 	    if(li.get(i).getOpen_balance().equals(""))
-	 	      {
-	 	    	tran_open_balance=(double) 0;
-	 	      }
-	 	      else
-	 	      {
-	 	        tran_open_balance=Double.parseDouble(li.get(i).getOpen_balance());
-	 	      }
- 		}
- 		 System.out.println(" balance_type  "+balance_type);
- 		 JSONObject jsonObject = new JSONObject();
- 	      //Inserting key-value pairs into the json object
-// 	      jsonObject.put("ID", "1");
-// 	      jsonObject.put("First_Name", "Krishna Kasyap");
-// 	      jsonObject.put("Last_Name", "Bhagavatula");
-// 	      jsonObject.put("Date_Of_Birth", "1989-09-26");
-// 	      jsonObject.put("Place_Of_Birth", "Vishakhapatnam");
-// 	      jsonObject.put("Country", "25000");
- 	      //Creating a json array
- 	      JSONArray array = new JSONArray();
-// 	      array.add("e-mail: krishna_kasyap@gmail.com");
- 	      //Adding array to the json object
- 	     cur_balance1=cur_balance1+tran_open_balance;
-List<Account_transactions_v3> li1=(List<Account_transactions_v3>) transactionServiceRepo.selectAccStmtTransaction2Bndates(ledgerId,description,start,end);
-//Iterator<Account_transactions_v3> it = li1.iterator(); 
-//while (it.hasNext()) { 
-//	
-//	Account_transactions_v3 ob = it.next(); 
-//	
-//	System.out.println("fgdfgdf"+ob.getType());
-//	
-//}
- String flag=null;
-System.out.println(li1.size());
-if(li1.size()>0)
-{
-for (int i = 0; i < li1.size(); i++)   
-	{ 
-	 if (li1.get(i).getDbt_ac().equals( ledger_id)) {
-   	  particular = Integer.parseInt(li1.get(i).getCrdt_ac());
-     }
-     if (li1.get(i).getCrdt_ac().equals(ledger_id)) {
-   	  particular = Integer.parseInt(li1.get(i).getDbt_ac());
-     }
-    particularname= ledgerServiceRepo.ac_ledger_SearchName(particular);
-    System.out.println("particularname  "+ particularname);
-//    System.out.println("balance_type  "+ balance_type);
-//	balance_type=li1.get(i).get
-	   Amount =Double.parseDouble(li1.get(i).getAmount()) ;
-//	   System.out.println("Amount  "+ Amount);
-//	   System.out.println("Dbt_ac  "+ li1.get(i).getDbt_ac());
-//	   
-//	   System.out.println("Crdt_ac  "+ li1.get(i).getCrdt_ac());
-                   if (li1.get(i).getDbt_ac().equals( ledger_id)) {
-	   	                if (balance_type.equals("debit")) {
-	   	                  cur_balance1 =
-	   	                  cur_balance1 + Amount;
-	   	                } else if (balance_type.equals("credit")) {
-	   	                  cur_balance1 =
-	   	                    cur_balance1 - Amount;
-	   	                }
-	   	                debit_total1 =
-	   	                  debit_total1 + Amount;
-	   	                flag="debit";
-	   	              }
-                   if (li1.get(i).getCrdt_ac().equals(ledger_id)) {
-   	                if (balance_type.equals("debit")) {
-   	                  cur_balance1 =
-  	                   cur_balance1 - Amount;
-   	                } else if (balance_type.equals("credit")) {
-    	                  cur_balance1 =
-    	                    cur_balance1 + Amount;
-    	             }
-   	                credit_total1 =
-    	                 credit_total1 + Amount;
-   	             flag="credit";
-   	               }
-                   created_date=li1.get(i).getCreatedDate();
-                   tran_description=li1.get(i).getDescription();
-                   System.out.println("cur_balance1  "+ cur_balance1);
-                   array.put("e-mail:"+cur_balance1);
-                   array.put("particularname "+particularname);
-                   array.put("flag "+flag);
-//                   cur_balance1=(float) 0;
-//                   Amount=(float) 0;
-                   li1.get(i).setFilename(particularname);
-       			li1.get(i).setAmount(Double.toString(Amount));
-       			li1.get(i).setCreatedDate(created_date);
-       			li1.get(i).setDescription(tran_description);
-       		li1.get(i).setBank(Double.toString(cur_balance1));
-       		li1.get(i).setBranch(flag);
-           }
-li1.get(0).setChq_no(Double.toString( debit_total1));
-li1.get(0).setChq_date(Double.toString( credit_total1));
-if(debit_total1==0&&credit_total1!=0)
-{
-	 balance=credit_total1; 
-}
-if(debit_total1!=0&&credit_total1==0)
-{
-	 balance=debit_total1;  
-}
-if(debit_total1!=0&&credit_total1!=0)
-{
-	balance=debit_total1-credit_total1;
-}
-li1.get(0).setCreatedTime(Double.toString( balance));
-      System.out.println("debit_total1  "+ debit_total1+"  "+credit_total1);
-      jsonObject.put("contact",array);
-      System.out.println("array  "+ array);
-}	
- 		return li1;
-    }
-    public String updateledgerbalance()
-    {
-    	double as1=0,lab2=0,inc2=0,exp1=0;
-    	List<Account_ledger_v3> li=(List<Account_ledger_v3>) ledgerServiceRepo.ledgerLoad("1");
-    	if(li.size()>0)
- 		{
- 		for (int i = 0; i < li.size(); i++)   
- 		{ 
- 		as1=  ledgerBalance(li.get(i).getId());
- 		li.get(i).setAmount(Double.toString(as1));
-		ledgerServiceRepo.saveAll(li);
- 		}
- 		}
-	List<Account_ledger_v3> li2=(List<Account_ledger_v3>) ledgerServiceRepo.ledgerLoad("2");
-    	if(li2.size()>0)
- 		{
- 		for (int i = 0; i < li2.size(); i++)   
- 		{ 
- 			lab2=  ledgerBalanceforliabality(li2.get(i).getId());
- 		li2.get(i).setAmount(Double.toString(lab2));
-		ledgerServiceRepo.saveAll(li2);
- 		}
- 		}
-	List<Account_ledger_v3> li3=(List<Account_ledger_v3>) ledgerServiceRepo.ledgerLoad("3");
-    	if(li3.size()>0)
- 		{
- 		for (int i = 0; i < li3.size(); i++)   
- 		{ 
- 			inc2=  ledgerBalanceforliabality(li3.get(i).getId());
- 		li3.get(i).setAmount(Double.toString(inc2));
-		ledgerServiceRepo.saveAll(li3);
- 		}
- 		}
-	List<Account_ledger_v3> li4=(List<Account_ledger_v3>) ledgerServiceRepo.ledgerLoad("4");
-    	if(li4.size()>0)
- 		{
- 		for (int i = 0; i < li4.size(); i++)   
- 		{ 
- 			exp1=  ledgerBalance(li4.get(i).getId());
- 		li4.get(i).setAmount(Double.toString(exp1));
-		ledgerServiceRepo.saveAll(li4);
- 		}
- 		}
-    	return "ledgerbalance updated";
-    }
-   public Double ledgerBalance(int id)
-     {
-	   double dbtTotAmount =0;
-	   double crdtTotAmount =0;
-	   double balance=0;
-		List<Account_transactions_v3> li=(List<Account_transactions_v3>) transactionServiceRepo.dbtAcLoad(id);
-		if(li.size()>0)
- 		{
- 		for (int i = 0; i < li.size(); i++)   
- 		{ 
- 			dbtTotAmount=dbtTotAmount+ Double.parseDouble(li.get(i).getAmount());
- 		}
- 		}
-		List<Account_transactions_v3> li1=(List<Account_transactions_v3>) transactionServiceRepo.crdtAcLoad(id);
-		if(li1.size()>0)
- 		{
- 		for (int i = 0; i < li1.size(); i++)   
- 		{ 
- 			crdtTotAmount=crdtTotAmount+ Double.parseDouble(li1.get(i).getAmount());
- 		}
- 		}
-		balance= dbtTotAmount-crdtTotAmount;
-	   return  balance;
-    }
-   public Double ledgerBalanceforliabality(int id)
-   {
-	   double dbtTotAmount = 0;
-	   double crdtTotAmount =0;
-	   double balance=0;
-		List<Account_transactions_v3> li=(List<Account_transactions_v3>) transactionServiceRepo.dbtAcLoad(id);
-		if(li.size()>0)
-		{
-		for (int i = 0; i < li.size(); i++)   
-		{ 
-			dbtTotAmount=dbtTotAmount+ Double.parseDouble(li.get(i).getAmount());
-		}
-		}
-		List<Account_transactions_v3> li1=(List<Account_transactions_v3>) transactionServiceRepo.crdtAcLoad(id);
-		if(li1.size()>0)
-		{
-		for (int i = 0; i < li1.size(); i++)   
-		{ 
-			crdtTotAmount=crdtTotAmount+ Double.parseDouble(li1.get(i).getAmount());
-		}
-		}
-		balance= crdtTotAmount-dbtTotAmount;
-	   return  balance;
-  }
-//    
-//    public List<Account_ledger_v3> balanceSheetDataBnDates(String title, String end)  {
-// 		System.out.println(title);
-// 		
-// 		String start="2017-04-01";
-// 		
-// 		Long fixedLiabalityAmount=(long) 0;
-// 		Long credit_total=(long) 0;
-// 		Long debit_total =(long) 0;
-// 		Float amount_balance =(float) 0;
-// 		Long balance =(long) 0;
-//     
-// 		
-// 		
-// 		List<Account_ledger_v3> li=(List<Account_ledger_v3>) ledgerServiceRepo.profit_loss(title);
-// 	
-// 		
-// 		if(li.size()>0)
-// 		{
-// 			
-// 		for (int i = 0; i < li.size(); i++)   
-// 		{ 
-// 			 
-// 	 		 credit_total=(long) 0;
-// 	 		 debit_total =(long) 0;
-// 	 		 amount_balance =(float) 0;
-// 	 		 balance =(long) 0;
-// 			
-// 			
-// 			
-// 			
-// 			
-// 			if(!li.get(i).getAmount().equals("0") && !li.get(i).getAmount().equals(""))
-// 			{
-// 			
-// 				int id=li.get(i).getId();
-// 				String Id=Integer.toString( li.get(i).getId());
-// 				
-// 				System.out.println("id "+ id);
-// 				
-// 				Float amount=Float.parseFloat( li.get(i).getAmount());
-// 				
-// 				List<Account_transactions_v3> li1=(List<Account_transactions_v3>) transactionServiceRepo.selectBalanceSheetDataBnDates(id,start,end);
-// 				
-// 				System.out.println("li1 "+ li1.size());
-// 				
-// 				
-// 				for (int j = 0; j < li1.size(); j++)   
-// 		 		{  
-// 		 			
-// 				
-// 					if (li1.get(j).getDbt_ac().equals(Id)) {
-// 		 	 	          debit_total =  (long) (debit_total +Float.parseFloat(li1.get(j).getAmount()));   
-// 		 	 	        }
-// 		 	 	        if (li1.get(j).getCrdt_ac().equals(Id)){
-// 		 	 	          credit_total = (long) (credit_total+Float.parseFloat(li1.get(j).getAmount()));  
-// 		 	 	        }
-// 					
-// 		 	 	     System.out.println("dbtAc"+ li1.get(j).getDbt_ac());
-// 		 	 	  System.out.println("CrdtAc"+ li1.get(j).getCrdt_ac());
-// 		 		System.out.println("credit_total "+ credit_total);
-// 		 	 	        
-// 			    }
-// 				
-// 				
-// 				if(debit_total>credit_total)
-//                {
-//                balance=(long) (debit_total-credit_total);
-//                }
-//                
-//                else
-//                {
-//                balance=(long) (credit_total-debit_total);
-//                }
-// 				
-// 				System.out.println("debit_total "+ debit_total);
-// 				System.out.println("credit_total "+ credit_total);
-// 				System.out.println("balance "+ balance);
-// 				
-// 				
-// 			
-// 				fixedLiabalityAmount=(long) (fixedLiabalityAmount +balance);
-//
-// 	 	      li.get(i).setAmount(Long.toString(balance));
-// 			
-// 	 	    System.out.println("fixedLiabalityAmount "+ fixedLiabalityAmount);
-// 			}
-// 		}
-// 		
-// 		li.get(0).setBranch(Long.toString(fixedLiabalityAmount));
-// 		}
-// 		
-// 	return li;	
-//    }
-   public List<Account_ledger_v3> balanceSheetDataBnDates(String title,String Start, String end)  {
-		System.out.println(title);
-		System.out.println("Start Date "+Start);
-		String start=Start;
-		double fixedLiabalityAmount=(double) 0;
-		double credit_total=(double) 0;
-		double debit_total =(double) 0;
-		Float amount_balance =(float) 0;
-		double balance =(double) 0;
-		List<Account_ledger_v3> li=(List<Account_ledger_v3>) ledgerServiceRepo.profit_loss(title);
-		if(li.size()>0)
-		{
-		for (int i = 0; i < li.size(); i++)   
-		{ 
-	 		 credit_total=(double) 0;
-	 		 debit_total =(double) 0;
-	 		 amount_balance =(float) 0;
-	 		 balance =(double) 0;
-			if(!li.get(i).getAmount().equals("0") && !li.get(i).getAmount().equals(""))
-			{
-				int id=li.get(i).getId();
-				String Id=Integer.toString( li.get(i).getId());
-				System.out.println("id "+ id);
-				Float amount=Float.parseFloat( li.get(i).getAmount());
-				List<Account_transactions_v3> li1=(List<Account_transactions_v3>) transactionServiceRepo.selectBalanceSheetDataBnDates(id,start,end);
-				System.out.println("li1 "+ li1.size());
-				for (int j = 0; j < li1.size(); j++)   
-		 		{  
-					if (li1.get(j).getDbt_ac().equals(Id)) {
-		 	 	          debit_total =  (double) (debit_total +Float.parseFloat(li1.get(j).getAmount()));   
-		 	 	        }
-		 	 	        if (li1.get(j).getCrdt_ac().equals(Id)){
-		 	 	          credit_total = (double) (credit_total+Float.parseFloat(li1.get(j).getAmount()));  
-		 	 	        }
-		 	 	     System.out.println("dbtAc"+ li1.get(j).getDbt_ac());
-		 	 	  System.out.println("CrdtAc"+ li1.get(j).getCrdt_ac());
-		 		System.out.println("credit_total "+ credit_total);
-			    }
-				if(debit_total>credit_total)
-               {
-               balance=(double) (debit_total-credit_total);
-               }
-               else
-               {
-               balance=(double) (credit_total-debit_total);
-               }
-				System.out.println("debit_total "+ debit_total);
-				System.out.println("credit_total "+ credit_total);
-				System.out.println("balance "+ balance);
-				fixedLiabalityAmount=(double) (fixedLiabalityAmount +balance);
-	 	      li.get(i).setAmount(Double.toString(balance));
-	 	    System.out.println("fixedLiabalityAmount "+ fixedLiabalityAmount);
-			}
-		}
-		li.get(0).setBranch(Double.toString(fixedLiabalityAmount));
-		}
-	return li;	
-   }
-//    public List<Account_ledger_v3> balanceSheetProfitLossDataBnDates(String title, String end)  {
-// 		System.out.println(title);
-// 		System.out.println(end);
-// 		
-// 		long directIncomeAmount=(long) 0;
-//    	
-// 		List<Account_ledger_v3> li=(List<Account_ledger_v3>) ledgerServiceRepo.balanceSheetProfitLossDataBnDate(title,end);
-// 		 		
-// 		 		System.out.println(li.size());
-// 		 		
-// 		 		
-// 		 		if(li.size()>0)
-// 		 		{
-//
-// 		 		for (int i = 0; i < li.size(); i++)   
-// 		 			{ 
-// 		 			
-// 		 			if(!li.get(i).getAmount().equals("0")&&!li.get(i).getAmount().equals(""))
-// 		 			{
-// 		 			
-// 		 				directIncomeAmount=(long) (directIncomeAmount+Float.parseFloat(li.get(i).getAmount()));
-// 		 			}
-// 		 		
-// 		 			
-// 		 		
-// 		 		}
-// 		    	
-// 		    	li.get(0).setBranch(Long.toString(directIncomeAmount));
-// 		 		System.out.println("directIncomeAmount  "+directIncomeAmount);
-// 		    	
-// 		    }
-// 		 		
-// 		
-// 		return li;
-// 		
-//    }
-    public List<Account_ledger_v3> balanceSheetProfitLossDataBnDates(String title, String start  , String end)  {
- 		System.out.println(title);
- 		System.out.println(end);
- 		double directIncomeAmount=(double) 0;
- 		List<Account_ledger_v3> li=(List<Account_ledger_v3>) ledgerServiceRepo.balanceSheetProfitLossDataBnDate(title,start ,end);
- 		 		System.out.println(li.size());
- 		 		if(li.size()>0)
- 		 		{
- 		 		for (int i = 0; i < li.size(); i++)   
- 		 			{ 
- 		 			if(!li.get(i).getAmount().equals("0")&&!li.get(i).getAmount().equals(""))
- 		 			{
- 		 				directIncomeAmount=(double) (directIncomeAmount+Float.parseFloat(li.get(i).getAmount()));
- 		 			}
- 		 		}
- 		    	li.get(0).setBranch(Double.toString(directIncomeAmount));
- 		 		System.out.println("directIncomeAmount  "+directIncomeAmount);
- 		    }
- 		return li;
-    }
-    public List<Account_ledger_v3> trial_balance(String acType)  {
-    	Double total_debit =(double) 0;
-    	Double total_credit = (double) 0;
-    	Double total_balance =(double) 0;
-    	Double Balance =(double) 0;
-    	Double as1=(double) 0;
-List<Account_ledger_v3> li=(List<Account_ledger_v3>) ledgerServiceRepo.trial_balances(acType);
- 		System.out.println(li.size());
- 		if(li.size()>0)
- 		{
- 		for (int i = 0; i < li.size(); i++)   
- 			{ 
- 			int id= li.get(i).getId();
- 			Double dbtAmnt=transactionServiceRepo.selectTrialBalanceDbt(id);
- 			Double dbtAmntWithoutOpenBalance = transactionServiceRepo.selectTrialBalanceDbtWithoutOpenBalance(id);
- 			System.out.println("dbtAmnt  "+dbtAmnt);
- 			System.out.println("dbtAmntWithoutOpenBalance  "+dbtAmntWithoutOpenBalance);
- 			if(dbtAmnt!=null)
- 			{
- 			total_debit=total_debit+dbtAmnt;
- 			}
- 			Double crdtAmnt=transactionServiceRepo.selectTrialBalanceCrdt(id);
- 			Double crdtAmntWithoutOpenBalance = transactionServiceRepo.selectTrialBalanceCrdtWithoutOpenBalance(id);
- 			System.out.println("crdtAmnt  "+crdtAmnt);
- 			System.out.println("crdtAmntWithoutOpenBalance  "+crdtAmntWithoutOpenBalance);
- 			if(crdtAmnt!=null)
- 			{
- 			total_credit=total_credit+crdtAmnt;
- 			}
- 			if(dbtAmnt==null)
- 			{
- 				dbtAmnt=(double) 0;
- 				dbtAmntWithoutOpenBalance=(double) 0;
- 			}
- 			if(crdtAmnt==null)
- 			{
- 				crdtAmnt=(double) 0;
- 				crdtAmntWithoutOpenBalance=(double) 0;
- 			}
- 			if(dbtAmntWithoutOpenBalance==null)
- 			{
- 				dbtAmntWithoutOpenBalance=(double) 0;
- 			}
- 			if(crdtAmntWithoutOpenBalance==null)
- 			{
- 				crdtAmntWithoutOpenBalance=(double) 0;
- 			}
- 			Balance=Math.abs(dbtAmnt-crdtAmnt);
-			as1= dbtAmnt-crdtAmnt;
-			total_balance = total_balance+Balance;
-			li.get(i).setAddress(Double.toString(dbtAmnt));
-			li.get(i).setEmail(Double.toString(crdtAmnt));
-			li.get(i).setBank(Double.toString(Balance));
-			li.get(i).setMobile(Double.toString(as1));
-			li.get(i).setIfsc_code(Double.toString(dbtAmntWithoutOpenBalance));
-			li.get(i).setState(Double.toString(crdtAmntWithoutOpenBalance));
- 		}
-//    	li.get(0).setBranch(Long.toString(directIncomeAmount));
-// 		System.out.println("directIncomeAmount  "+directIncomeAmount);
- 		li.get(0).setContact(Double.toString(total_balance));
- 		System.out.println("total_balance "+ total_balance);
-    }
- 		return li;
-    }
-    public String trial_balance_total()  {
-    	Double totalDbt= transactionServiceRepo.selectTotalDbtAmnt();
-			System.out.println("totalDbt "+ totalDbt);
-			Double totalCrd= transactionServiceRepo.selectTotalCrdAmnt();
-			System.out.println("totalCrd "+ totalCrd);
-			String c= totalDbt+","+totalCrd;
-			return c;
-    }
-    public List<Account_ledger_v3> trial_balanceBnDate(String acType,String start,String end)  {
-        Double total_debit =(double) 0;
-        Double total_credit = (double) 0;
-        Double total_balance =(double) 0;
-        Double Balance =(double) 0;
-        Double as1=(double) 0;
-    List<Account_ledger_v3> li=(List<Account_ledger_v3>) ledgerServiceRepo.trial_balances(acType);
-     		System.out.println(li.size());
-     		if(li.size()>0)
-     		{
-     		for (int i = 0; i < li.size(); i++)   
-     			{ 
-     			int id= li.get(i).getId();
-     			Double dbtAmnt=transactionServiceRepo.selectTrialBalanceDbtBnDates(id,start,end);
-     			System.out.println("dbtAmnt  "+dbtAmnt);
-     			if(dbtAmnt!=null)
-     			{
-     			total_debit=total_debit+dbtAmnt;
-     			}
-     			Double crdtAmnt=transactionServiceRepo.selectTrialBalanceCrdtBnDates(id,start,end);
-     			System.out.println("crdtAmnt  "+crdtAmnt);
-     			if(crdtAmnt!=null )
-     			{
-     			total_credit=total_credit+crdtAmnt;
-     			}
-     			if(dbtAmnt==null)
-     			{
-     				dbtAmnt=(double) 0;
-     			}
-     			if(crdtAmnt==null)
-     			{
-     				crdtAmnt=(double) 0;
-     			}
-     			Balance=Math.abs(dbtAmnt-crdtAmnt);
-    			as1= dbtAmnt-crdtAmnt;
-    			total_balance = total_balance+Balance;
-    			li.get(i).setAddress(Double.toString(dbtAmnt));
-    			li.get(i).setEmail(Double.toString(crdtAmnt));
-    			li.get(i).setBank(Double.toString(Balance));
-    			li.get(i).setMobile(Double.toString(as1));
-     		}
-//        	li.get(0).setBranch(Long.toString(directIncomeAmount));
-//     		System.out.println("directIncomeAmount  "+directIncomeAmount);
-     		li.get(0).setContact(Double.toString(total_balance));
-     		System.out.println("total_balance "+ total_balance);
+
+    // ---------------------------------------------------------------------
+    // Helpers (local to this class)
+    // ---------------------------------------------------------------------
+
+    /** Parse a number from String safely: "", null, "Nil", "-" → 0. */
+    private static double parseNum(String s) {
+        if (s == null) return 0d;
+        String t = s.trim();
+        if (t.isEmpty()) return 0d;
+        String lower = t.toLowerCase();
+        if ("nil".equals(lower) || "-".equals(lower) || "undefined".equals(lower)) return 0d;
+        try {
+            return Double.parseDouble(t.replace(",", ""));
+        } catch (NumberFormatException ex) {
+            return 0d;
         }
-     		return li;
+    }
+
+    /** Null Double → 0. */
+    private static double nz(Double v) {
+        return v == null ? 0d : v.doubleValue();
+    }
+
+    /** Double → String. */
+    private static String ds(double v) {
+        return Double.toString(v);
+    }
+
+    /** Resolve and write group names into the list (ac_group ← name). */
+    private void applyGroupNames(List<Account_ledger_v3> ledgers) {
+        if (ledgers == null) return;
+        for (Account_ledger_v3 l : ledgers) {
+            if (l == null) continue;
+            try {
+                String grpCode = l.getAc_group();
+                String grpName = (String) groupServiceRepo.selectGroup(grpCode);
+                l.setAc_group(grpName);
+            } catch (Exception e) {
+                log.debug("Group lookup failed for {}", l.getAc_group(), e);
+            }
         }
-   public String trial_balance_totalBnDate(String start,String end)  {
-    	Double totalDbt= transactionServiceRepo.selectTotalDbtAmntBnDates(start,end);
-			System.out.println("totalDbt "+ totalDbt);
-			Double totalCrd= transactionServiceRepo.selectTotalCrdAmntBnDates(start,end);
-			System.out.println("totalCrd "+ totalCrd);
-			if(totalDbt==null)
-			{
-				totalDbt=(double) 0;
-			}
-			if(totalCrd==null)
-			{
-				totalCrd=(double) 0;
-			}
-			String c= totalDbt+","+totalCrd;
-			return c;
     }
-   public List<Account_ledger_v3> bankDatas()  {
-List<Account_ledger_v3> li=(List<Account_ledger_v3>) ledgerServiceRepo.bankData();
-	return li;	
-   }
-   public List<Account_ledger_v3> selectCustomers()  {
-		List<Account_ledger_v3> li=(List<Account_ledger_v3>) ledgerServiceRepo.selectCustomer();
-		return li;
+
+    // ---------------------------------------------------------------------
+    // Basic CRUD / Queries
+    // ---------------------------------------------------------------------
+
+    public Account_ledger_v3 add_Ledgers(Account_ledger_v3 fp) {
+        return ledgerServiceRepo.save(fp);
     }
-   public List<Account_ledger_v3> selectServices()  {
-		List<Account_ledger_v3> li=(List<Account_ledger_v3>) ledgerServiceRepo.selectService();
-		return li;
+
+    @SuppressWarnings("unchecked")
+    public List<Account_ledger_v3> last_idSearchs() {
+        return (List<Account_ledger_v3>) ledgerServiceRepo.last_id_Search();
     }
-     ////////////////////////////////ac_dashboard//////////////////////////////
-	public List<Account_ledger_v3> ac_dashboardCashData()  {
-		List<Account_ledger_v3> li=(List<Account_ledger_v3>) ledgerServiceRepo.ac_dashboardCashDatas();
-		return li;
-	}
-    public List<Account_ledger_v3> ac_dashboardBankData()  {
-		List<Account_ledger_v3> li=(List<Account_ledger_v3>) ledgerServiceRepo.ac_dashboardBankDatas();
-		return li;
-	}
-    //////////////////index page////////////////////
-    public List<Account_ledger_v3> index_customer_vendorApi(String grp)  {
-		List<Account_ledger_v3> li=(List<Account_ledger_v3>) ledgerServiceRepo.index_customer_vendorApis(grp);
-		return li;
-	}
-  //////////////////Migration Date////////////////////
-    public String migrationDateAdd(String mgrDate)  {
-		List<Account_ledger_v3> li=(List<Account_ledger_v3>) ledgerServiceRepo.last_id_Search();
-		if(li.size()>0)
-		{
-			for(int i=0;i<li.size();i++)
-			{
-				Account_ledger_v3 li1= ledgerServiceRepo.ledger_Search_MigrationDate(li.get(i).getId());
-				li1.setLedger_date(mgrDate);
-				ledgerServiceRepo.save(li1);
-			}
-		}
-		return "Added";
-	}
+
+    @SuppressWarnings("unchecked")
+    public List<Account_ledger_v3> ledger_name_searchs(String ledgerName) {
+        log.debug("ledger_name_searchs: {}", ledgerName);
+        return (List<Account_ledger_v3>) ledgerServiceRepo.ledger_name_search(ledgerName);
+    }
+
+    @SuppressWarnings("unchecked")
+    public List<Account_ledger_v3> list_ledgers() {
+        List<Account_ledger_v3> list = (List<Account_ledger_v3>) ledgerServiceRepo.selectData();
+        applyGroupNames(list);
+        return list;
+    }
+
+    @SuppressWarnings("unchecked")
+    public List<Account_ledger_v3> ledger_sorts(String field, String type) {
+        log.debug("ledger_sorts field={} type={}", field, type);
+        List<Account_ledger_v3> list = null;
+
+        // Keep existing repo methods; just centralize branching
+        if ("ledger_name".equals(field)) {
+            list = "ASC".equalsIgnoreCase(type) ? ledgerServiceRepo.ledger_nameA() : ledgerServiceRepo.ledger_nameD();
+        } else if ("ac_group".equals(field)) {
+            list = "ASC".equalsIgnoreCase(type) ? ledgerServiceRepo.ac_groupA() : ledgerServiceRepo.ac_groupD();
+        } else if ("open_balance".equals(field)) {
+            list = "ASC".equalsIgnoreCase(type) ? ledgerServiceRepo.open_balanceA() : ledgerServiceRepo.open_balanceD();
+        } else if ("mobile".equals(field)) {
+            list = "ASC".equalsIgnoreCase(type) ? ledgerServiceRepo.mobileA() : ledgerServiceRepo.mobileD();
+        } else if ("email".equals(field)) {
+            list = "ASC".equalsIgnoreCase(type) ? ledgerServiceRepo.emailA() : ledgerServiceRepo.emailD();
+        } else if ("bank".equals(field)) {
+            list = "ASC".equalsIgnoreCase(type) ? ledgerServiceRepo.bankA() : ledgerServiceRepo.bankD();
+        }
+
+        applyGroupNames(list);
+        return list;
+    }
+
+    @SuppressWarnings("unchecked")
+    public List<Account_ledger_v3> ledger_bn_dates(String start, String end) {
+        log.debug("ledger_bn_dates start={} end={}", start, end);
+        List<Account_ledger_v3> list = (List<Account_ledger_v3>) ledgerServiceRepo.selectDataBnDate(start, end);
+        applyGroupNames(list);
+        return list;
+    }
+
+    public String ledger_deletes(int id) {
+        ledgerServiceRepo.deleteById(id);
+        // transactionServiceRepo.transactionDelete(id); // kept as-is (commented)
+        return "Deleted successfully";
+    }
+
+    @SuppressWarnings("unchecked")
+    public List<Account_ledger_v3> ledger_Searchs(int ledgerId) {
+        log.debug("ledger_Searchs id={}", ledgerId);
+        return (List<Account_ledger_v3>) ledgerServiceRepo.ledger_Search(ledgerId);
+    }
+
+    @SuppressWarnings("unchecked")
+    public List<Account_ledger_v3> bank_names() {
+        return (List<Account_ledger_v3>) ledgerServiceRepo.selectBank();
+    }
+
+    @SuppressWarnings("unchecked")
+    public List<Account_ledger_v3> ledger_Searchs2(int ledgerId) {
+        log.debug("ledger_Searchs2 id={}", ledgerId);
+        return (List<Account_ledger_v3>) ledgerServiceRepo.ledger_Search2(ledgerId);
+    }
+
+    // ---------------------------------------------------------------------
+    // Account Statement (current to date)
+    // Preserves original field encodings in returned rows.
+    // ---------------------------------------------------------------------
+
+    @SuppressWarnings("unchecked")
+    public List<Account_transactions_v3> account_statementDatas(int ledgerId) {
+        log.debug("account_statementDatas ledgerId={}", ledgerId);
+
+        String ledgerIdStr = Integer.toString(ledgerId);
+        List<Account_ledger_v3> ledgers = (List<Account_ledger_v3>) ledgerServiceRepo.ledger_Search2(ledgerId);
+
+        double currentBalance = 0d;
+        double debitTotal = 0d;
+        double creditTotal = 0d;
+        String balanceType = null;
+
+        // Opening balance by ledger
+        for (Account_ledger_v3 l : ledgers) {
+            if (l == null) continue;
+            balanceType = l.getBalance_type();
+            double open = parseNum(l.getOpen_balance());
+            if ("debit".equalsIgnoreCase(balanceType)) {
+                debitTotal += open;
+            } else if ("credit".equalsIgnoreCase(balanceType)) {
+                creditTotal += open;
+            }
+            currentBalance += open;
+        }
+
+        // Seed transactions
+        List<Account_transactions_v3> txs =
+            (List<Account_transactions_v3>) transactionServiceRepo.selectAccStmtTransaction2(ledgerId, "ledger creation");
+
+        // Merge filtered (legacy behavior preserved)
+        List<Account_transactions_v3> filtered =
+            (List<Account_transactions_v3>) transactionServiceRepo.transactionFilter(ledgerId, "ledger creation");
+        if (filtered != null && filtered.size() > 1) {
+            // remove last and append others
+            filtered.remove(filtered.size() - 1);
+            txs.addAll(filtered);
+        }
+
+        // Walk and compute running balance; encode fields as before
+        String flag = null;
+        for (Account_transactions_v3 t : txs) {
+            if (t == null) continue;
+
+            int particular;
+            if (ledgerIdStr.equals(t.getDbt_ac())) {
+                particular = parseIntSafe(t.getCrdt_ac(), 0);
+            } else if (ledgerIdStr.equals(t.getCrdt_ac())) {
+                particular = parseIntSafe(t.getDbt_ac(), 0);
+            } else {
+                continue;
+            }
+
+            String particularName = ledgerServiceRepo.ac_ledger_SearchName(particular);
+            double amount = parseNum(t.getAmount());
+
+            if (ledgerIdStr.equals(t.getDbt_ac())) {
+                // debit to this ledger
+                if ("debit".equalsIgnoreCase(balanceType)) currentBalance += amount;
+                else if ("credit".equalsIgnoreCase(balanceType)) currentBalance -= amount;
+                debitTotal += amount;
+                flag = "debit";
+            } else if (ledgerIdStr.equals(t.getCrdt_ac())) {
+                // credit to this ledger
+                if ("debit".equalsIgnoreCase(balanceType)) currentBalance -= amount;
+                else if ("credit".equalsIgnoreCase(balanceType)) currentBalance += amount;
+                creditTotal += amount;
+                flag = "credit";
+            }
+
+            // encode into fields (legacy UI expectation)
+            t.setFilename(particularName);
+            t.setAmount(ds(amount));
+            t.setBank(ds(currentBalance));   // running balance
+            t.setBranch(flag);               // direction marker
+        }
+
+        // Totals into first row meta fields (legacy behavior)
+        if (!txs.isEmpty()) {
+            Account_transactions_v3 first = txs.get(0);
+            first.setChq_no(ds(debitTotal));
+            first.setChq_date(ds(creditTotal));
+
+            double balance;
+            if (debitTotal == 0 && creditTotal != 0) {
+                balance = creditTotal;
+            } else if (debitTotal != 0 && creditTotal == 0) {
+                balance = debitTotal;
+            } else {
+                balance = debitTotal - creditTotal;
+            }
+            first.setCreatedTime(ds(balance));
+        }
+
+        return txs;
+    }
+
+    // ---------------------------------------------------------------------
+    // Profit & Loss (unchanged public behavior)
+    // ---------------------------------------------------------------------
+
+    @SuppressWarnings("unchecked")
+    public List<Account_ledger_v3> profit_losss(String title) {
+        double total = 0d;
+        List<Account_ledger_v3> list = (List<Account_ledger_v3>) ledgerServiceRepo.profit_loss(title);
+        if (!list.isEmpty()) {
+            for (Account_ledger_v3 l : list) {
+                total += parseNum(l.getAmount());
+            }
+            list.get(0).setBranch(ds(total)); // legacy: store sum in first.branch
+        }
+        return list;
+    }
+
+    @SuppressWarnings("unchecked")
+    public List<Account_ledger_v3> profit_loss_bn_dates(String title, String start, String end) {
+        double grand = 0d;
+        List<Account_ledger_v3> ledgers = (List<Account_ledger_v3>) ledgerServiceRepo.profit_loss_idSearchByTitle(title);
+        if (!ledgers.isEmpty()) {
+            for (Account_ledger_v3 l : ledgers) {
+                int id = l.getId();
+                double perLedger = 0d;
+                List<Account_transactions_v3> txs =
+                    (List<Account_transactions_v3>) transactionServiceRepo.profit_loss_bn_date(id, start, end);
+                if (txs != null) {
+                    for (Account_transactions_v3 t : txs) {
+                        perLedger += parseNum(t.getAmount());
+                    }
+                }
+                l.setAmount(ds(perLedger));
+                grand += perLedger;
+            }
+            ledgers.get(0).setBranch(ds(grand)); // legacy: sum in first.branch
+        }
+        return ledgers;
+    }
+
+    // ---------------------------------------------------------------------
+    // Account Statement (between dates)
+    // ---------------------------------------------------------------------
+
+    @SuppressWarnings("unchecked")
+    public List<Account_transactions_v3> account_statementDataBnDates(int ledgerId, String start, String end) {
+        log.debug("account_statementDataBnDates ledgerId={} {}..{}", ledgerId, start, end);
+
+        String ledgerIdStr = Integer.toString(ledgerId);
+        List<Account_ledger_v3> ledgers = (List<Account_ledger_v3>) ledgerServiceRepo.ledger_Search2(ledgerId);
+
+        double currentBalance = 0d;
+        double debitTotal = 0d;
+        double creditTotal = 0d;
+        String balanceType = null;
+
+        // Opening balance
+        for (Account_ledger_v3 l : ledgers) {
+            if (l == null) continue;
+            balanceType = l.getBalance_type();
+            double open = parseNum(l.getOpen_balance());
+            if ("debit".equalsIgnoreCase(balanceType)) debitTotal += open;
+            else if ("credit".equalsIgnoreCase(balanceType)) creditTotal += open;
+            currentBalance += open;
+        }
+
+        List<Account_transactions_v3> txs =
+            (List<Account_transactions_v3>) transactionServiceRepo
+                .selectAccStmtTransaction2Bndates(ledgerId, "ledger creation", start, end);
+
+        String flag = null;
+        if (txs != null && !txs.isEmpty()) {
+            for (Account_transactions_v3 t : txs) {
+                if (t == null) continue;
+
+                int particular;
+                if (ledgerIdStr.equals(t.getDbt_ac())) {
+                    particular = parseIntSafe(t.getCrdt_ac(), 0);
+                } else if (ledgerIdStr.equals(t.getCrdt_ac())) {
+                    particular = parseIntSafe(t.getDbt_ac(), 0);
+                } else {
+                    continue;
+                }
+
+                String particularName = ledgerServiceRepo.ac_ledger_SearchName(particular);
+                double amount = parseNum(t.getAmount());
+
+                if (ledgerIdStr.equals(t.getDbt_ac())) {
+                    if ("debit".equalsIgnoreCase(balanceType)) currentBalance += amount;
+                    else if ("credit".equalsIgnoreCase(balanceType)) currentBalance -= amount;
+                    debitTotal += amount;
+                    flag = "debit";
+                } else if (ledgerIdStr.equals(t.getCrdt_ac())) {
+                    if ("debit".equalsIgnoreCase(balanceType)) currentBalance -= amount;
+                    else if ("credit".equalsIgnoreCase(balanceType)) currentBalance += amount;
+                    creditTotal += amount;
+                    flag = "credit";
+                }
+
+                t.setFilename(particularName);
+                t.setAmount(ds(amount));
+                t.setBank(ds(currentBalance));  // running balance
+                t.setBranch(flag);
+            }
+
+            // Totals into first row meta fields (legacy)
+            Account_transactions_v3 first = txs.get(0);
+            first.setChq_no(ds(debitTotal));
+            first.setChq_date(ds(creditTotal));
+
+            double balance;
+            if (debitTotal == 0 && creditTotal != 0) balance = creditTotal;
+            else if (debitTotal != 0 && creditTotal == 0) balance = debitTotal;
+            else balance = debitTotal - creditTotal;
+            first.setCreatedTime(ds(balance));
+        }
+
+        return txs;
+    }
+
+    // ---------------------------------------------------------------------
+    // Ledger balance utilities & updaters
+    // ---------------------------------------------------------------------
+
+    @SuppressWarnings("unchecked")
+    public String updateledgerbalance() {
+        // type 1
+        List<Account_ledger_v3> type1 = (List<Account_ledger_v3>) ledgerServiceRepo.ledgerLoad("1");
+        for (Account_ledger_v3 l : type1) l.setAmount(ds(ledgerBalance(l.getId())));
+        ledgerServiceRepo.saveAll(type1);
+
+        // type 2
+        List<Account_ledger_v3> type2 = (List<Account_ledger_v3>) ledgerServiceRepo.ledgerLoad("2");
+        for (Account_ledger_v3 l : type2) l.setAmount(ds(ledgerBalanceforliabality(l.getId())));
+        ledgerServiceRepo.saveAll(type2);
+
+        // type 3
+        List<Account_ledger_v3> type3 = (List<Account_ledger_v3>) ledgerServiceRepo.ledgerLoad("3");
+        for (Account_ledger_v3 l : type3) l.setAmount(ds(ledgerBalanceforliabality(l.getId())));
+        ledgerServiceRepo.saveAll(type3);
+
+        // type 4
+        List<Account_ledger_v3> type4 = (List<Account_ledger_v3>) ledgerServiceRepo.ledgerLoad("4");
+        for (Account_ledger_v3 l : type4) l.setAmount(ds(ledgerBalance(l.getId())));
+        ledgerServiceRepo.saveAll(type4);
+
+        return "ledgerbalance updated";
+    }
+
+    @SuppressWarnings("unchecked")
+    public Double ledgerBalance(int id) {
+        double dbtTot = 0d;
+        double crdTot = 0d;
+
+        List<Account_transactions_v3> dbts = (List<Account_transactions_v3>) transactionServiceRepo.dbtAcLoad(id);
+        for (Account_transactions_v3 t : dbts) dbtTot += parseNum(t.getAmount());
+
+        List<Account_transactions_v3> crds = (List<Account_transactions_v3>) transactionServiceRepo.crdtAcLoad(id);
+        for (Account_transactions_v3 t : crds) crdTot += parseNum(t.getAmount());
+
+        return dbtTot - crdTot;
+    }
+
+    @SuppressWarnings("unchecked")
+    public Double ledgerBalanceforliabality(int id) {
+        double dbtTot = 0d;
+        double crdTot = 0d;
+
+        List<Account_transactions_v3> dbts = (List<Account_transactions_v3>) transactionServiceRepo.dbtAcLoad(id);
+        for (Account_transactions_v3 t : dbts) dbtTot += parseNum(t.getAmount());
+
+        List<Account_transactions_v3> crds = (List<Account_transactions_v3>) transactionServiceRepo.crdtAcLoad(id);
+        for (Account_transactions_v3 t : crds) crdTot += parseNum(t.getAmount());
+
+        return crdTot - dbtTot;
+    }
+
+    // ---------------------------------------------------------------------
+    // Balance Sheet helpers
+    // ---------------------------------------------------------------------
+
+    @SuppressWarnings("unchecked")
+    public List<Account_ledger_v3> balanceSheetDataBnDates(String title, String Start, String end) {
+        log.debug("balanceSheetDataBnDates title={} start={} end={}", title, Start, end);
+        String start = Start;
+
+        double fixedLiabilityTotal = 0d;
+        List<Account_ledger_v3> ledgers = (List<Account_ledger_v3>) ledgerServiceRepo.profit_loss(title);
+
+        if (!ledgers.isEmpty()) {
+            for (Account_ledger_v3 l : ledgers) {
+                double debitTotal = 0d;
+                double creditTotal = 0d;
+                double balance = 0d;
+
+                if (!"0".equals(l.getAmount()) && !"".equals(l.getAmount())) {
+                    int id = l.getId();
+                    String idStr = Integer.toString(id);
+
+                    @SuppressWarnings("unchecked")
+                    List<Account_transactions_v3> txs =
+                        (List<Account_transactions_v3>) transactionServiceRepo.selectBalanceSheetDataBnDates(id, start, end);
+
+                    for (Account_transactions_v3 t : txs) {
+                        if (idStr.equals(t.getDbt_ac())) {
+                            debitTotal += parseNum(t.getAmount());
+                        }
+                        if (idStr.equals(t.getCrdt_ac())) {
+                            creditTotal += parseNum(t.getAmount());
+                        }
+                    }
+
+                    balance = Math.abs(debitTotal - creditTotal);
+                    fixedLiabilityTotal += balance;
+                    l.setAmount(ds(balance));
+                }
+            }
+            ledgers.get(0).setBranch(ds(fixedLiabilityTotal)); // legacy: sum in first.branch
+        }
+
+        return ledgers;
+    }
+
+    @SuppressWarnings("unchecked")
+    public List<Account_ledger_v3> balanceSheetProfitLossDataBnDates(String title, String start, String end) {
+        log.debug("balanceSheetProfitLossDataBnDates title={} {}..{}", title, start, end);
+        double total = 0d;
+        List<Account_ledger_v3> list =
+            (List<Account_ledger_v3>) ledgerServiceRepo.balanceSheetProfitLossDataBnDate(title, start, end);
+
+        if (!list.isEmpty()) {
+            for (Account_ledger_v3 l : list) {
+                total += parseNum(l.getAmount());
+            }
+            list.get(0).setBranch(ds(total)); // legacy: sum in first.branch
+        }
+
+        return list;
+    }
+
+    // ---------------------------------------------------------------------
+    // Trial Balance (non-breaking; safer null handling)
+    // ---------------------------------------------------------------------
+
+    @SuppressWarnings("unchecked")
+    public List<Account_ledger_v3> trial_balance(String acType) {
+        double totalDebit = 0d;
+        double totalCredit = 0d;
+        double totalBalance = 0d;
+
+        List<Account_ledger_v3> list = (List<Account_ledger_v3>) ledgerServiceRepo.trial_balances(acType);
+        if (!list.isEmpty()) {
+            for (Account_ledger_v3 l : list) {
+                int id = l.getId();
+
+                double dbt = nz(transactionServiceRepo.selectTrialBalanceDbt(id));
+                double crd = nz(transactionServiceRepo.selectTrialBalanceCrdt(id));
+                double dbtWO = nz(transactionServiceRepo.selectTrialBalanceDbtWithoutOpenBalance(id));
+                double crdWO = nz(transactionServiceRepo.selectTrialBalanceCrdtWithoutOpenBalance(id));
+
+                totalDebit += dbt;
+                totalCredit += crd;
+
+                double absDiff = Math.abs(dbt - crd);
+                double signedDiff = dbt - crd;
+                totalBalance += absDiff;
+
+                l.setAddress(ds(dbt));     // debit
+                l.setEmail(ds(crd));       // credit
+                l.setBank(ds(absDiff));    // abs diff
+                l.setMobile(ds(signedDiff));
+                l.setIfsc_code(ds(dbtWO)); // debit w/o opening balance
+                l.setState(ds(crdWO));     // credit w/o opening balance
+            }
+            list.get(0).setContact(ds(totalBalance)); // legacy: total in first.contact
+        }
+        return list;
+    }
+
+    public String trial_balance_total() {
+        double totalDbt = nz(transactionServiceRepo.selectTotalDbtAmnt());
+        double totalCrd = nz(transactionServiceRepo.selectTotalCrdAmnt());
+        return ds(totalDbt) + "," + ds(totalCrd);
+    }
+
+    @SuppressWarnings("unchecked")
+    public List<Account_ledger_v3> trial_balanceBnDate(String acType, String start, String end) {
+        double totalDebit = 0d;
+        double totalCredit = 0d;
+        double totalBalance = 0d;
+
+        List<Account_ledger_v3> list = (List<Account_ledger_v3>) ledgerServiceRepo.trial_balances(acType);
+        if (!list.isEmpty()) {
+            for (Account_ledger_v3 l : list) {
+                int id = l.getId();
+
+                double dbt = nz(transactionServiceRepo.selectTrialBalanceDbtBnDates(id, start, end));
+                double crd = nz(transactionServiceRepo.selectTrialBalanceCrdtBnDates(id, start, end));
+
+                totalDebit += dbt;
+                totalCredit += crd;
+
+                double absDiff = Math.abs(dbt - crd);
+                double signedDiff = dbt - crd;
+                totalBalance += absDiff;
+
+                l.setAddress(ds(dbt));
+                l.setEmail(ds(crd));
+                l.setBank(ds(absDiff));
+                l.setMobile(ds(signedDiff));
+            }
+            list.get(0).setContact(ds(totalBalance));
+        }
+        return list;
+    }
+
+    public String trial_balance_totalBnDate(String start, String end) {
+        double totalDbt = nz(transactionServiceRepo.selectTotalDbtAmntBnDates(start, end));
+        double totalCrd = nz(transactionServiceRepo.selectTotalCrdAmntBnDates(start, end));
+        return ds(totalDbt) + "," + ds(totalCrd);
+    }
+
+    // ---------------------------------------------------------------------
+    // Misc lists
+    // ---------------------------------------------------------------------
+
+    @SuppressWarnings("unchecked")
+    public List<Account_ledger_v3> bankDatas() {
+        return (List<Account_ledger_v3>) ledgerServiceRepo.bankData();
+    }
+
+    @SuppressWarnings("unchecked")
+    public List<Account_ledger_v3> selectCustomers() {
+        return (List<Account_ledger_v3>) ledgerServiceRepo.selectCustomer();
+    }
+
+    @SuppressWarnings("unchecked")
+    public List<Account_ledger_v3> selectServices() {
+        return (List<Account_ledger_v3>) ledgerServiceRepo.selectService();
+    }
+
+    @SuppressWarnings("unchecked")
+    public List<Account_ledger_v3> ac_dashboardCashData() {
+        return (List<Account_ledger_v3>) ledgerServiceRepo.ac_dashboardCashDatas();
+    }
+
+    @SuppressWarnings("unchecked")
+    public List<Account_ledger_v3> ac_dashboardBankData() {
+        return (List<Account_ledger_v3>) ledgerServiceRepo.ac_dashboardBankDatas();
+    }
+
+    @SuppressWarnings("unchecked")
+    public List<Account_ledger_v3> index_customer_vendorApi(String grp) {
+        return (List<Account_ledger_v3>) ledgerServiceRepo.index_customer_vendorApis(grp);
+    }
+
+    @SuppressWarnings("unchecked")
+    public String migrationDateAdd(String mgrDate) {
+        List<Account_ledger_v3> list = (List<Account_ledger_v3>) ledgerServiceRepo.last_id_Search();
+        for (Account_ledger_v3 l : list) {
+            Account_ledger_v3 upd = ledgerServiceRepo.ledger_Search_MigrationDate(l.getId());
+            upd.setLedger_date(mgrDate);
+            ledgerServiceRepo.save(upd);
+        }
+        return "Added";
+    }
+
+    // small util
+    private static int parseIntSafe(String s, int fallback) {
+        try { return Integer.parseInt(s); } catch (Exception e) { return fallback; }
+    }
 }

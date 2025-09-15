@@ -4,6 +4,7 @@ import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -11,10 +12,13 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.net.URLDecoder;
 
 import jakarta.servlet.ServletContext;
 import jakarta.servlet.http.HttpServletRequest;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.io.InputStreamResource;
 import org.springframework.http.HttpEntity;
@@ -74,10 +78,11 @@ import com.example.demo.service.TemplateService;
 import com.example.demo.service.TransactionService;
 import com.example.demo.service.UserService;
 
-@CrossOrigin(origins = "http://localhost:3000")
-// @CrossOrigin(origins="http://intz.live:8080")
+@CrossOrigin(origins = {"http://localhost:5173", "https://your-prod-domain.com"})
 @RestController
+@RequestMapping("")
 public class UserControllerNew {
+    private static final Logger logger = LoggerFactory.getLogger(UserControllerNew.class);
 
     @Autowired private EmailService service;
     @Autowired private AcTitleService acTitleService;
@@ -100,10 +105,46 @@ public class UserControllerNew {
     @Autowired private UserRepo userRepo;
     @Autowired private UserService userService;
 
+    // Inner class for login request body
+    public static class LoginRequest {
+        private String userName;
+        private String password;
+
+        public LoginRequest() {}
+
+        public LoginRequest(String userName, String password) {
+            this.userName = userName;
+            this.password = password;
+        }
+
+        public String getUserName() {
+            return userName;
+        }
+
+        public void setUserName(String userName) {
+            this.userName = userName;
+        }
+
+        public String getPassword() {
+            return password;
+        }
+
+        public void setPassword(String password) {
+            this.password = password;
+        }
+    }
+
+    @PostMapping("/login")
+    public List<Account_user_v3> logins(@RequestBody LoginRequest loginRequest) {
+        logger.info("Login attempt for userName: {}", loginRequest.getUserName());
+        List<Account_user_v3> users = userService.login(loginRequest.getUserName(), loginRequest.getPassword());
+        logger.info("Login response size: {}", users.size());
+        return users;
+    }
+
     @PostMapping("/sendingEmail")
     public MailResponse sendEmail(@RequestBody MailRequest request) {
-        System.out.println("Invoice date " + request.getInv_date());
-        System.out.println("Ready to mail");
+        logger.info("Sending email for invoice date: {}", request.getInv_date());
         Map<String, Object> model = new HashMap<>();
         model.put("invDate", request.getInv_date());
         model.put("invNo", request.getInv_no());
@@ -120,8 +161,7 @@ public class UserControllerNew {
 
     @PostMapping("/sendingEmailUpdate")
     public MailResponse sendEmailUpdate(@RequestBody MailRequest request) {
-        System.out.println("Invoice date " + request.getInv_date());
-        System.out.println("Ready to mail");
+        logger.info("Sending email update for invoice date: {}", request.getInv_date());
         Map<String, Object> model = new HashMap<>();
         model.put("invDate", request.getInv_date());
         model.put("invNo", request.getInv_no());
@@ -137,20 +177,24 @@ public class UserControllerNew {
     }
 
     @GetMapping("/ac_title")
-    public List<Account_title_v3> ac_Title() { return acTitleService.ac_Titles(); }
+    public List<Account_title_v3> ac_Title() {
+        return acTitleService.ac_Titles();
+    }
 
     @GetMapping("/acTitle_search")
     public List<Account_title_v3> acTitle_searchs(@RequestParam(value = "acId") String acId) {
         return acTitleService.acTitle_search(acId);
     }
 
-    @RequestMapping(value = "/add_group", method = RequestMethod.POST)
+    @PostMapping("/add_group")
     public Account_group_v3 add_Group(@RequestBody Account_group_v3 fp) {
         return groupService.add_Groups(fp);
     }
 
     @GetMapping("/view_group")
-    public List<Account_group_v3> view_Group() { return groupService.view_Groups(); }
+    public List<Account_group_v3> view_Group() {
+        return groupService.view_Groups();
+    }
 
     @GetMapping("/grp_sorting")
     public List<Account_group_v3> grp_sort(@RequestParam(value = "field") String field,
@@ -160,12 +204,12 @@ public class UserControllerNew {
 
     @GetMapping("/grp_by_id")
     public List<Account_group_v3> grp_idSearch(@RequestParam(value = "grpId") String grpId) {
-        return groupService.grp_idSearchs(grpId);
+        return groupService.grp_idSearchSearch(grpId);
     }
 
     @PutMapping("/grp_update/{grpId}")
     public ResponseEntity<Object> grp_updates(@RequestBody Account_group_v3 grp, @PathVariable int grpId) {
-        System.out.println(grp);
+        logger.debug("Updating group: {}", grp);
         Optional<Account_group_v3> studentOptional = groupServiceRepo.findById(grpId);
         if (!studentOptional.isPresent()) return ResponseEntity.notFound().build();
         groupServiceRepo.save(grp);
@@ -173,23 +217,27 @@ public class UserControllerNew {
     }
 
     @RequestMapping(value = "/grp_delete/{id}", method = RequestMethod.DELETE)
-    public String grp_delete(@PathVariable int id) { return groupService.grp_deletes(id); }
+    public String grp_delete(@PathVariable int id) {
+        return groupService.grp_deletes(id);
+    }
 
     @GetMapping("/grp_name_search")
     public List<Account_group_v3> grp_nameSearch(@RequestParam(value = "grpName") String grpName) {
         return groupService.grp_nameSearchs(grpName);
     }
 
-    //////////////////////////// Ledger & Account Transaction ////////////////////////////////////////
-    @RequestMapping(value = "/add_ledger", method = RequestMethod.POST)
+    // Ledger & Account Transaction
+    @PostMapping("/add_ledger")
     public Account_ledger_v3 add_Ledger(@RequestBody Account_ledger_v3 fp) {
         return ledgerService.add_Ledgers(fp);
     }
 
     @GetMapping("/last_id_search")
-    public List<Account_ledger_v3> last_id_Search() { return ledgerService.last_idSearchs(); }
+    public List<Account_ledger_v3> last_id_Search() {
+        return ledgerService.last_idSearchs();
+    }
 
-    @RequestMapping(value = "/add_transaction", method = RequestMethod.POST)
+    @PostMapping("/add_transaction")
     public Account_transactions_v3 add_Transaction(@RequestBody Account_transactions_v3 fp) {
         return transactionService.add_Transactions(fp);
     }
@@ -200,10 +248,14 @@ public class UserControllerNew {
     }
 
     @GetMapping("/transactionDate")
-    public List<Account_transactions_v3> transactionDate() { return transactionService.transactionDates(); }
+    public List<Account_transactions_v3> transactionDate() {
+        return transactionService.transactionDates();
+    }
 
     @GetMapping("/list_ledger")
-    public List<Account_ledger_v3> list_ledger() { return ledgerService.list_ledgers(); }
+    public List<Account_ledger_v3> list_ledger() {
+        return ledgerService.list_ledgers();
+    }
 
     @GetMapping("/ledger_sorting")
     public List<Account_ledger_v3> ledger_sort(@RequestParam(value = "field") String field,
@@ -218,7 +270,9 @@ public class UserControllerNew {
     }
 
     @RequestMapping(value = "/ledger_delete/{id}", method = RequestMethod.DELETE)
-    public String ledger_delete(@PathVariable int id) { return ledgerService.ledger_deletes(id); }
+    public String ledger_delete(@PathVariable int id) {
+        return ledgerService.ledger_deletes(id);
+    }
 
     @GetMapping("/ledger_search")
     public List<Account_ledger_v3> ledger_Search(@RequestParam(value = "ledgerId") int ledgerId) {
@@ -227,7 +281,7 @@ public class UserControllerNew {
 
     @PutMapping("/ledger_update/{ledgerId}")
     public ResponseEntity<Object> ledger_updates(@RequestBody Account_ledger_v3 ledger, @PathVariable int ledgerId) {
-        System.out.println(ledger);
+        logger.debug("Updating ledger: {}", ledger);
         Optional<Account_ledger_v3> studentOptional = ledgerServiceRepo.findById(ledgerId);
         if (!studentOptional.isPresent()) return ResponseEntity.notFound().build();
         ledgerServiceRepo.save(ledger);
@@ -240,12 +294,16 @@ public class UserControllerNew {
         return transactionService.ledger_transaction_searchs(dbt_ac, crdt_ac);
     }
 
-    //////////////////////////// Payments /////////////////////////
+    // Payments
     @GetMapping("/bank_name")
-    public List<Account_ledger_v3> bank_name() { return ledgerService.bank_names(); }
+    public List<Account_ledger_v3> bank_name() {
+        return ledgerService.bank_names();
+    }
 
     @GetMapping("/list_transaction")
-    public List<Account_transactions_v3> list_transaction() { return transactionService.list_transactions(); }
+    public List<Account_transactions_v3> list_transaction() {
+        return transactionService.list_transactions();
+    }
 
     @GetMapping("/transaction_sorting")
     public List<Account_transactions_v3> transaction_sort(@RequestParam(value = "field") String field,
@@ -264,22 +322,26 @@ public class UserControllerNew {
         return transactionService.transaction_searchs(transactionId);
     }
 
-    @RequestMapping(value = "/add_payment", method = RequestMethod.POST)
+    @PostMapping("/add_payment")
     public Account_transactions_v3 add_payment(@RequestBody Account_transactions_v3 fp) {
         return transactionService.add_payments(fp);
     }
 
     @RequestMapping(value = "/payment_delete/{id}", method = RequestMethod.DELETE)
-    public String payment_delete(@PathVariable int id) { return transactionService.payment_deletes(id); }
+    public String payment_delete(@PathVariable int id) {
+        return transactionService.payment_deletes(id);
+    }
 
-    ////////////////// Journal /////////////
-    @RequestMapping(value = "/add_journalTransaction", method = RequestMethod.POST)
+    // Journal
+    @PostMapping("/add_journalTransaction")
     public Account_transactions_v3 add_journalTransaction(@RequestBody Account_transactions_v3 fp) {
         return transactionService.add_journalTransactions(fp);
     }
 
     @GetMapping("/list_journal")
-    public List<Account_transactions_v3> list_journal() { return transactionService.list_journals(); }
+    public List<Account_transactions_v3> list_journal() {
+        return transactionService.list_journals();
+    }
 
     @GetMapping("/journal_sorting")
     public List<Account_transactions_v3> journal_sort(@RequestParam(value = "field") String field,
@@ -294,306 +356,48 @@ public class UserControllerNew {
     }
 
     @RequestMapping(value = "/journal_delete/{id}", method = RequestMethod.DELETE)
-    public String journal_delete(@PathVariable int id) { return transactionService.journal_deletes(id); }
-
-    @GetMapping("/journal_search")
-    public List<Account_transactions_v3> journal_search(@RequestParam(value = "tranId") String tranId) {
-        return transactionService.journal_searchs(tranId);
+    public String journal_delete(@PathVariable int id) {
+        return transactionService.journal_deletes(id);
     }
 
-    @PutMapping("/journal_update/{tranID}")
-    public ResponseEntity<Object> journal_updates(@RequestBody Account_transactions_v3 journal, @PathVariable int tranID) {
-        System.out.println(journal);
-        Optional<Account_transactions_v3> studentOptional = transactionServiceRepo.findById(tranID);
+    @GetMapping("/journal_search")
+    public List<Account_transactions_v3> journal_search(@RequestParam(value = "journalId") String journalId) {
+        return transactionService.journal_searchs(journalId);
+    }
+
+    @PutMapping("/journal_update/{journalId}")
+    public ResponseEntity<Object> journal_updates(@RequestBody Account_transactions_v3 journal, @PathVariable int journalId) {
+        logger.debug("Updating journal: {}", journal);
+        Optional<Account_transactions_v3> studentOptional = transactionServiceRepo.findById(journalId);
         if (!studentOptional.isPresent()) return ResponseEntity.notFound().build();
         transactionServiceRepo.save(journal);
         return ResponseEntity.noContent().build();
     }
 
-    ////////////////// Receipt /////////////
-    @GetMapping("/list_receipt")
-    public List<Account_transactions_v3> list_receipt() { return transactionService.list_receipts(); }
-
-    @GetMapping("/receipt_sorting")
-    public List<Account_transactions_v3> receipt_sort(@RequestParam(value = "field") String field,
-                                                      @RequestParam(value = "type") String type) {
-        return transactionService.receipt_sorts(field, type);
+    // Invoice
+    @PostMapping("/add_invoice")
+    public Invoice add_invoice(@RequestBody Invoice fp) {
+        return invoiceService.add_invoices(fp);
     }
-
-    @GetMapping("/receipt_bn_date")
-    public List<Account_transactions_v3> receipt_bn_date(@RequestParam(value = "start") String start,
-                                                         @RequestParam(value = "end") String end) {
-        return transactionService.receipt_bn_dates(start, end);
-    }
-
-    ////////////////// account statement //////////
-    @GetMapping("/list_account_statement")
-    public List<Account_ledger_v3> list_account_statement() { return transactionService.list_account_statements(); }
-
-    @GetMapping("/list_acTitle")
-    public String list_acTitle(@RequestParam(value = "acId") String acId) {
-        return acTitleService.list_acTitles(acId);
-    }
-
-    @GetMapping("/list_account_statement_transaction")
-    public List<Account_transactions_v3> accStmtTransaction(@RequestParam(value = "id") String id,
-                                                            @RequestParam(value = "description") String description) {
-        return transactionService.accStmtTransactions(id, description);
-    }
-
-    @GetMapping("/ledger_search2")
-    public List<Account_ledger_v3> ledger_Search2(@RequestParam(value = "ledgerId") int ledgerId) {
-        return ledgerService.ledger_Searchs2(ledgerId);
-    }
-
-    @GetMapping("/account_statementData")
-    public List<Account_transactions_v3> account_statementData(@RequestParam(value = "ledgerId") int ledgerId) {
-        return ledgerService.account_statementDatas(ledgerId);
-    }
-
-    @GetMapping("/profit_loss")
-    public List<Account_ledger_v3> profit_loss(@RequestParam(value = "title") String title) {
-        return ledgerService.profit_losss(title);
-    }
-
-    @GetMapping("/profit_loss_bn_date")
-    public List<Account_ledger_v3> profit_loss_bn_date(@RequestParam(value = "title") String title,
-                                                       @RequestParam(value = "start") String start,
-                                                       @RequestParam(value = "end") String end) {
-        return ledgerService.profit_loss_bn_dates(title, start, end);
-    }
-
-    @GetMapping("/list_account_statement_transactionBnDates")
-    public List<Account_transactions_v3> accStmtTransactionBnDate(@RequestParam(value = "id") String id,
-                                                                  @RequestParam(value = "description") String description,
-                                                                  @RequestParam(value = "start") String start,
-                                                                  @RequestParam(value = "end") String end) {
-        return transactionService.accStmtTransactionBnDates(id, description, start, end);
-    }
-
-    @GetMapping("/account_statementDataBnDates")
-    public List<Account_transactions_v3> account_statementDataBnDate(@RequestParam(value = "ledgerId") int ledgerId,
-                                                                     @RequestParam(value = "start") String start,
-                                                                     @RequestParam(value = "end") String end) {
-        return ledgerService.account_statementDataBnDates(ledgerId, start, end);
-    }
-
-    ////////////////// Balance Sheet ////////////
-    @GetMapping("/balanceSheetDataBnDates")
-    public List<Account_ledger_v3> balanceSheetDataBnDate(@RequestParam(value = "title") String title,
-                                                          @RequestParam(value = "start") String start,
-                                                          @RequestParam(value = "end") String end) {
-        return ledgerService.balanceSheetDataBnDates(title, start, end);
-    }
-
-    @GetMapping("/balanceSheetProfitLossDataBnDates")
-    public List<Account_ledger_v3> balanceSheetProfitLossDataBnDate(@RequestParam(value = "title") String title,
-                                                                    @RequestParam(value = "start") String start,
-                                                                    @RequestParam(value = "end") String end) {
-        return ledgerService.balanceSheetProfitLossDataBnDates(title, start, end);
-    }
-
-    @GetMapping("/updateledgerbalance")
-    public String updateledgerbalances() { return ledgerService.updateledgerbalance(); }
-
-    ///////////// trial balance ///////////
-    @GetMapping("/trial_balance")
-    public List<Account_ledger_v3> trial_balances(@RequestParam(value = "acType") String acType) {
-        return ledgerService.trial_balance(acType);
-    }
-
-    @GetMapping("/trial_balance_total")
-    public String trial_balance_totals() { return ledgerService.trial_balance_total(); }
-
-    @GetMapping("/trial_balanceBnDates")
-    public List<Account_ledger_v3> trial_balanceBnDates(@RequestParam(value = "acType") String acType,
-                                                        @RequestParam(value = "start") String start,
-                                                        @RequestParam(value = "end") String end) {
-        return ledgerService.trial_balanceBnDate(acType, start, end);
-    }
-
-    @GetMapping("/trial_balance_totalBnDates")
-    public String trial_balance_totalBnDates(@RequestParam(value = "start") String start,
-                                             @RequestParam(value = "end") String end) {
-        return ledgerService.trial_balance_totalBnDate(start, end);
-    }
-
-    // /////////// File Upload //////////
-    @PutMapping("/files")
-    public ResponseEntity<FileResponse> uploadFile(@RequestParam("file") MultipartFile file) throws IOException {
-        System.out.println(file.getOriginalFilename());
-        String fileName = fileStorageService.storeFile(file);
-        String fileDownloadUri = ServletUriComponentsBuilder.fromCurrentContextPath()
-                .path("\\images")
-                .path(fileName)
-                .toUriString();
-
-        FileResponse fileResponse = new FileResponse(fileName, fileDownloadUri, file.getContentType(), file.getSize());
-        return new ResponseEntity<>(fileResponse, HttpStatus.OK);
-    }
-
-    @GetMapping("/fileDownload")
-    public ResponseEntity<InputStreamResource> downloadFile1(@RequestParam(value = "fileName") String fileName)
-            throws IOException {
-        MediaType mediaType = MediaTypeUtils.getMediaTypeForFileName(this.servletContext, fileName);
-        System.out.println("fileName: " + fileName);
-        System.out.println("mediaType: " + mediaType);
-        File file = new File("\\images" + "/" + fileName);
-        InputStreamResource resource = new InputStreamResource(new FileInputStream(file));
-        return ResponseEntity.ok()
-                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment;filename=" + file.getName())
-                .contentType(mediaType)
-                .contentLength(file.length())
-                .body(resource);
-    }
-
-    //////////////////////// Cash Book //////////////////
-    @GetMapping("/cashBookOpeningBalanceData")
-    public List<Account_transactions_v3> cashBookOpeningBalanceDatas() {
-        return transactionService.cashBookOpeningBalanceData();
-    }
-
-    @GetMapping("/cashBookAccount_statementDatas")
-    public List<Account_transactions_v3> cashBookAccount_statementData(@RequestParam(value = "ledgerId") int ledgerId) {
-        return transactionService.cashBookAccount_statementDatas(ledgerId);
-    }
-
-    @GetMapping("/cashbook_sorting")
-    public List<Account_transactions_v3> cashbook_sort(@RequestParam(value = "field") String field,
-                                                       @RequestParam(value = "type") String type) {
-        return transactionService.cashbook_sorts(field, type);
-    }
-
-    @GetMapping("/cashBookBnDates")
-    public List<Account_transactions_v3> cashBookBnDate(@RequestParam(value = "start") String start,
-                                                        @RequestParam(value = "end") String end) {
-        return transactionService.cashBookBnDates(start, end);
-    }
-
-    @GetMapping("/cashBookOpeningBalanceBnDates")
-    public List<Account_transactions_v3> cashBookOpeningBalanceBnDate(@RequestParam(value = "start") String start,
-                                                                      @RequestParam(value = "end") String end) {
-        return transactionService.cashBookOpeningBalanceBnDates(start, end);
-    }
-
-    @GetMapping("/cashBookDelete")
-    public List<Account_transactions_v3> cashBookDeletes(@RequestParam(value = "tranId") String tranId) {
-        return transactionService.cashBookDelete(tranId);
-    }
-
-    ////////////////// Bank Book ///////////////
-    @GetMapping("/bankBookData")
-    public List<Account_transactions_v3> bankBookDatas() { return transactionService.bankBookData(); }
-
-    @GetMapping("/bankData")
-    public List<Account_ledger_v3> bankData() { return ledgerService.bankDatas(); }
-
-    @GetMapping("/bankBookDataB")
-    public List<Account_transactions_v3> bankBookDatasB(@RequestParam(value = "ledgerId") int ledgerId,
-                                                        @RequestParam(value = "start") String start,
-                                                        @RequestParam(value = "end") String end) {
-        return transactionService.bankBookDataB(ledgerId, start, end);
-    }
-
-    @GetMapping("/bankBookOpenBalanceDataB")
-    public List<Account_transactions_v3> bankBookOpenBalanceDataB(@RequestParam(value = "id") String id,
-                                                                  @RequestParam(value = "description") String description,
-                                                                  @RequestParam(value = "start") String start,
-                                                                  @RequestParam(value = "end") String end) {
-        return transactionService.bankBookOpenBalanceDataB(id, description, start, end);
-    }
-
-    @GetMapping("/bankBookDelete")
-    public List<Account_transactions_v3> bankBookDeletes(@RequestParam(value = "tranId") String tranId) {
-        return transactionService.bankBookDelete(tranId);
-    }
-
-    @GetMapping("/bankbook_sorting")
-    public List<Account_transactions_v3> bankbook_sort(@RequestParam(value = "field") String field,
-                                                       @RequestParam(value = "type") String type) {
-        return transactionService.bankbook_sorts(field, type);
-    }
-
-    // ////////// Day Book /////////
-    @GetMapping("/dayBookData")
-    public List<Account_transactions_v3> dayBookDatas() { return transactionService.dayBookData(); }
-
-    @GetMapping("/debitAcData")
-    public List<Account_transactions_v3> debitAcDatas() { return transactionService.debitAcData(); }
-
-    @GetMapping("/creditAcData")
-    public List<Account_transactions_v3> creditAcDatas() { return transactionService.creditAcData(); }
-
-    @GetMapping("/dayBookDataBnDate")
-    public List<Account_transactions_v3> dayBookDataBnDates(@RequestParam(value = "start") String start,
-                                                            @RequestParam(value = "end") String end,
-                                                            @RequestParam(value = "debit") String debit,
-                                                            @RequestParam(value = "credit") String credit) {
-        return transactionService.dayBookDataBnDate(start, end, debit, credit);
-    }
-
-    @GetMapping("/dayBookDelete")
-    public List<Account_transactions_v3> dayBookDeletes(@RequestParam(value = "tranId") String tranId) {
-        return transactionService.dayBookDelete(tranId);
-    }
-
-    @GetMapping("/daybook_sorting")
-    public List<Account_transactions_v3> daybook_sort(@RequestParam(value = "field") String field,
-                                                      @RequestParam(value = "type") String type) {
-        return transactionService.daybook_sorts(field, type);
-    }
-
-    // //////////////Transaction History////////////
-    @GetMapping("/transactionHistory_searching")
-    public List<Account_transactions_v3> transactionHistory_search(@RequestParam(value = "start") String start,
-                                                                   @RequestParam(value = "end") String end,
-                                                                   @RequestParam(value = "debit") String debit,
-                                                                   @RequestParam(value = "credit") String credit,
-                                                                   @RequestParam(value = "field") String field,
-                                                                   @RequestParam(value = "val") String val) {
-        return transactionService.transactionHistory_searchs(start, end, debit, credit, field, val);
-    }
-
-    ////////////////// invoice ////////////////////
-    @RequestMapping(value = "/add_invoice", method = RequestMethod.POST)
-    public Invoice add_invoice(@RequestBody Invoice fp) { return invoiceService.add_invoices(fp); }
 
     @GetMapping("/invoiceData")
-    public List<Invoice> invoiceData() { return invoiceService.invoiceDatas(); }
-
-    @GetMapping("/invoiceDataOnDashBoard")
-    public List<Invoice> invoiceDataOnDashBoard() { return invoiceService.invoiceDataOnDashBoards(); }
+    public List<Invoice> invoiceDatas() {
+        return invoiceService.invoiceData();
+    }
 
     @GetMapping("/invoiceDataById")
     public List<Invoice> invoiceDataById(@RequestParam(value = "invoiceId") String invoiceId) {
         return invoiceService.invoiceDataByIds(invoiceId);
     }
 
-    @PutMapping("/invoice_update/{invoiceId}")
-    public ResponseEntity<Object> invoice_updates(@RequestBody Invoice invoice, @PathVariable int invoiceId) {
-        System.out.println(invoice);
-        Optional<Invoice> studentOptional = invoiceRepo.findById(invoiceId);
-        if (!studentOptional.isPresent()) return ResponseEntity.notFound().build();
-        invoiceRepo.save(invoice);
-        return ResponseEntity.noContent().build();
-    }
-
-    @GetMapping("/customer_name")
-    public List<Account_ledger_v3> selectCustomer() { return ledgerService.selectCustomers(); }
-
-    @GetMapping("/service_name")
-    public List<Account_ledger_v3> selectService() { return ledgerService.selectServices(); }
-
-    @GetMapping("/journal_searchInvoice")
-    public List<Account_transactions_v3> journal_searchInvoice(@RequestParam(value = "tranId") String tranId,
-                                                               @RequestParam(value = "creditAc") String creditAc,
-                                                               @RequestParam(value = "debitAc") String debitAc) {
-        return transactionService.journal_searchInvoices(tranId, creditAc, debitAc);
+    @GetMapping("/invoiceDataOnDashBoard")
+    public List<Invoice> invoiceDataOnDashBoards() {
+        return invoiceService.invoiceDataOnDashBoard();
     }
 
     @GetMapping("/invoiceDataByTransactionId")
-    public List<Invoice> invoiceDataByTransactionId(@RequestParam(value = "transactionId") String transactionId) {
-        return invoiceService.invoiceDataByTransactionIds(transactionId);
+    public List<Invoice> invoiceDataByTransactionIds(@RequestParam(value = "transactionId") String transactionId) {
+        return invoiceService.invoiceDataByTransactionId(transactionId);
     }
 
     @GetMapping("/tran_gen_Search")
@@ -602,10 +406,12 @@ public class UserControllerNew {
     }
 
     @RequestMapping(value = "/invoiceDelete/{inv_id}", method = RequestMethod.DELETE)
-    public String invoiceDeletes(@PathVariable int inv_id) { return invoiceService.invoiceDelete(inv_id); }
+    public String invoiceDeletes(@PathVariable int inv_id) {
+        return invoiceService.invoiceDelete(inv_id);
+    }
 
-    ////////////////// invoice_sub ////////////////////
-    @RequestMapping(value = "/add_invoice_sub", method = RequestMethod.POST)
+    // Invoice Sub
+    @PostMapping("/add_invoice_sub")
     public Invoice_sub add_invoice_sub(@RequestBody Invoice_sub fp) {
         return invoiceService.add_invoice_subs(fp);
     }
@@ -615,55 +421,117 @@ public class UserControllerNew {
         return invoiceService.invoiceSubDataByIds(invoiceId);
     }
 
-    @RequestMapping(value = "/invoiceSubDelete/{inv_id}", method = RequestMethod.GET)
-    public String invoiceSubDeletes(@PathVariable String inv_id) { return invoiceService.invoiceSubDelete(inv_id); }
+    @GetMapping("/invoiceSubDelete/{inv_id}")
+    public String invoiceSubDeletes(@PathVariable String inv_id) {
+        return invoiceService.invoiceSubDelete(inv_id);
+    }
 
-    //////////////////////////////// ac_dashboard //////////////////////////////
+    // Dashboard
     @GetMapping("/ac_dashboardCashData")
-    public List<Account_ledger_v3> ac_dashboardCashDatas() { return ledgerService.ac_dashboardCashData(); }
+    public List<Account_ledger_v3> ac_dashboardCashDatas() {
+        return ledgerService.ac_dashboardCashData();
+    }
 
     @GetMapping("/ac_dashboardBankData")
-    public List<Account_ledger_v3> ac_dashboardBankDatas() { return ledgerService.ac_dashboardBankData(); }
+    public List<Account_ledger_v3> ac_dashboardBankDatas() {
+        return ledgerService.ac_dashboardBankData();
+    }
 
-    ////////////////////// index page /////////////////////////
+    // Index Page
     @GetMapping("/index_customer_vendorApi")
     public List<Account_ledger_v3> index_customer_vendorApis(@RequestParam(value = "grp") String grp) {
         return ledgerService.index_customer_vendorApi(grp);
     }
 
-    // ////////// Migration Date /////////
+    // Migration Date
     @GetMapping("/migrationDateAdd")
     public String migrationDateAdds(@RequestParam(value = "mgrDate") String mgrDate) {
         return ledgerService.migrationDateAdd(mgrDate);
     }
 
-    // //////// edit template file upload /////////
+    // Template File Upload
     @PutMapping("/uploadTemplateFile")
     public ResponseEntity<FileResponse> uploadTemplateFiles(@RequestParam("file") MultipartFile file)
             throws IOException {
-        System.out.println(file.getOriginalFilename());
-        String fileName = fileStorageService.storeFile(file);
+        logger.info("Uploading template file: {}", file.getOriginalFilename());
+        String originalName = file.getOriginalFilename();
+        String sanitizedName = originalName.replaceAll("\\s+", "-")
+                                           .replaceAll("[^a-zA-Z0-9.-]", "")
+                                           .toLowerCase();
+        MultipartFile sanitizedFile = new MultipartFileWrapper(file, sanitizedName); // Wrapper to override filename
+        String fileName = fileStorageService.storeFile(sanitizedFile);
         String fileDownloadUri = ServletUriComponentsBuilder.fromCurrentContextPath()
-                .path("C:\\Users\\SHERIN\\git\\JavaAccounts\\Intuisyz_Accounts_Java\\src\\main\\resources\\image")
+                .path("/image")
                 .path(fileName)
                 .toUriString();
-
-        String folder = "C:\\Users\\SHERIN\\git\\JavaAccounts\\Intuisyz_Accounts_Java\\frontend\\public\\assets\\images" + "/";
+        String folder = "/frontend/public/assets/images/";
         byte[] bytes = file.getBytes();
-        Path path = Paths.get(folder + file.getOriginalFilename());
-        Files.write(path, bytes);
-
+        Path filePath = Paths.get(folder + sanitizedName);
+        Files.write(filePath, bytes);
         FileResponse fileResponse = new FileResponse(fileName, fileDownloadUri, file.getContentType(), file.getSize());
         return new ResponseEntity<>(fileResponse, HttpStatus.OK);
     }
 
+    // Wrapper class to override MultipartFile filename
+    private static class MultipartFileWrapper implements MultipartFile {
+        private final MultipartFile delegate;
+        private final String filename;
+
+        MultipartFileWrapper(MultipartFile delegate, String filename) {
+            this.delegate = delegate;
+            this.filename = filename;
+        }
+
+        @Override
+        public String getName() {
+            return delegate.getName();
+        }
+
+        @Override
+        public String getOriginalFilename() {
+            return filename;
+        }
+
+        @Override
+        public String getContentType() {
+            return delegate.getContentType();
+        }
+
+        @Override
+        public boolean isEmpty() {
+            return delegate.isEmpty();
+        }
+
+        @Override
+        public long getSize() {
+            return delegate.getSize();
+        }
+
+        @Override
+        public byte[] getBytes() throws IOException {
+            return delegate.getBytes();
+        }
+
+        @Override
+        public InputStream getInputStream() throws IOException {
+            return delegate.getInputStream();
+        }
+
+        @Override
+        public void transferTo(File dest) throws IOException, IllegalStateException {
+            delegate.transferTo(dest);
+        }
+    }
+
     @GetMapping("/templateData")
-    public List<Invoice_template> templateDatas() { return templateService.templateData(); }
+    public List<Invoice_template> templateDatas() {
+        return templateService.templateData();
+    }
 
     @PutMapping("/template_update/{template_Id}")
     public ResponseEntity<Object> template_updates(@RequestBody Invoice_template invoice_template,
                                                    @PathVariable int template_Id) {
-        System.out.println(invoice_template);
+        logger.debug("Updating template: {}", invoice_template);
         Optional<Invoice_template> studentOptional = templateRepo.findById(template_Id);
         if (!studentOptional.isPresent()) return ResponseEntity.notFound().build();
         templateRepo.save(invoice_template);
@@ -673,10 +541,18 @@ public class UserControllerNew {
     @GetMapping("/invoiceImgFetch")
     public ResponseEntity<InputStreamResource> invoiceImgFetchs(@RequestParam(value = "fileName") String fileName)
             throws IOException {
-        MediaType mediaType = MediaTypeUtils.getMediaTypeForFileName(this.servletContext, fileName);
-        System.out.println("fileName: " + fileName);
-        System.out.println("mediaType: " + mediaType);
-        File file = new File("C:\\\\Users\\\\SHERIN\\\\git\\\\JavaAccounts\\\\Intuisyz_Accounts_Java\\\\src\\\\main\\\\resources\\\\image" + "/" + fileName);
+        logger.info("Fetching invoice image: {}", fileName);
+        String decodedName = URLDecoder.decode(fileName, StandardCharsets.UTF_8.name());
+        String sanitizedName = decodedName.replaceAll("\\s+", "-")
+                                          .replaceAll("[^a-zA-Z0-9.-]", "")
+                                          .toLowerCase();
+        logger.info("Sanitized filename: {}", sanitizedName);
+        MediaType mediaType = MediaTypeUtils.getMediaTypeForFileName(this.servletContext, sanitizedName);
+        File file = new File("/image/" + sanitizedName);
+        if (!file.exists()) {
+            logger.warn("File not found: /image/{}", sanitizedName);
+            return ResponseEntity.notFound().build();
+        }
         InputStreamResource resource = new InputStreamResource(new FileInputStream(file));
         return ResponseEntity.ok()
                 .header(HttpHeaders.CONTENT_DISPOSITION, "attachment;filename=" + file.getName())
@@ -698,8 +574,7 @@ public class UserControllerNew {
                                                   @RequestParam(value = "totalAmnt") String totalAmnt,
                                                   @RequestParam(value = "hsn") String hsn)
             throws IOException, TemplateException {
-
-        System.out.println("Ready to mail");
+        logger.info("Generating PDF for invoice: invNo={}", invNo);
         Map<String, Object> model = new HashMap<>();
         model.put("invDate", invDate);
         model.put("invNo", invNo);
@@ -713,7 +588,6 @@ public class UserControllerNew {
         model.put("totalAmnt", totalAmnt);
         model.put("hsn", hsn);
 
-        System.out.print("model val " + model);
         List<Invoice> li = invoiceRepo.invoiceData();
         int lastInvId = 0;
         if (li.size() > 0) {
@@ -729,14 +603,12 @@ public class UserControllerNew {
         if (li5.size() > 0) {
             String payTo = li5.get(0).getTemplate_payTo();
             String[] payToArray = payTo.split("\\r?\\n");
-
             String cName = li5.get(0).getTemplate_companyName();
             String cAddress = li5.get(0).getTemplate_companyAddress();
             String cContact = li5.get(0).getTemplate_companyContact();
             String name = li5.get(0).getTemplate_Name();
             String logoImg = li5.get(0).getTemplate_logo();
             String signImg = li5.get(0).getTemplate_sig();
-
             model.put("templateCompanyName", cName.split("\\r?\\n"));
             model.put("templateCompanyAddress", cAddress.split("\\r?\\n"));
             model.put("templateCompanyContact", cContact.split("\\r?\\n"));
@@ -772,8 +644,7 @@ public class UserControllerNew {
                                                            @RequestParam(value = "totalAmnt") String totalAmnt,
                                                            @RequestParam(value = "hsn") String hsn)
             throws IOException, TemplateException {
-
-        System.out.println("Ready to mail");
+        logger.info("Generating PDF for dashboard invoice: inv_id={}", inv_id);
         Map<String, Object> model = new HashMap<>();
         model.put("invDate", invDate);
         model.put("invNo", invNo);
@@ -796,14 +667,12 @@ public class UserControllerNew {
         if (li5.size() > 0) {
             String payTo = li5.get(0).getTemplate_payTo();
             String[] payToArray = payTo.split("\\r?\\n");
-
             String cName = li5.get(0).getTemplate_companyName();
             String cAddress = li5.get(0).getTemplate_companyAddress();
             String cContact = li5.get(0).getTemplate_companyContact();
             String name = li5.get(0).getTemplate_Name();
             String logoImg = li5.get(0).getTemplate_logo();
             String signImg = li5.get(0).getTemplate_sig();
-
             model.put("templateCompanyName", cName.split("\\r?\\n"));
             model.put("templateCompanyAddress", cAddress.split("\\r?\\n"));
             model.put("templateCompanyContact", cContact.split("\\r?\\n"));
@@ -825,41 +694,39 @@ public class UserControllerNew {
         return new HttpEntity<>(baos.toByteArray(), header);
     }
 
-    // --- Helper: HTML -> PDF using iText 7 html2pdf ---
+    // Helper: HTML -> PDF using iText 7 html2pdf
     private ByteArrayOutputStream generatePdf(String html) {
         ByteArrayOutputStream baos = new ByteArrayOutputStream();
         try {
             HtmlConverter.convertToPdf(html, baos);
             return baos;
         } catch (Exception e) {
-            e.printStackTrace();
-            return baos; // return whatever we have; callers set headers from length
+            logger.error("Error generating PDF: {}", e.getMessage(), e);
+            return baos;
         }
     }
 
-    // ////////////// Profile page //////////////
-    @RequestMapping(value = "/add_profile", method = RequestMethod.POST)
-    public Profile add_Profile(@RequestBody Profile fp) { return profileService.add_Profiles(fp); }
+    // Profile Page
+    @PostMapping("/add_profile")
+    public Profile add_Profile(@RequestBody Profile fp) {
+        return profileService.add_Profiles(fp);
+    }
 
     @GetMapping("/profileData")
-    public List<Profile> profileDatas() { return profileService.profileData(); }
+    public List<Profile> profileDatas() {
+        return profileService.profileData();
+    }
 
     @PutMapping("/profile_update/{organization_id}")
     public ResponseEntity<Object> profile_updates(@RequestBody Profile profile, @PathVariable int organization_id) {
-        System.out.println(profile);
+        logger.debug("Updating profile: {}", profile);
         Optional<Profile> studentOptional = profileRepo.findById(organization_id);
         if (!studentOptional.isPresent()) return ResponseEntity.notFound().build();
         profileRepo.save(profile);
         return ResponseEntity.noContent().build();
     }
 
-    // //////////// Login /////////////
-    @GetMapping("/login")
-    public String logins(@RequestParam(value = "userName") String userName,
-                         @RequestParam(value = "password") String password) {
-        return userService.login(userName, password);
-    }
-
+    // User Management
     @GetMapping("/userSearch")
     public List<Account_user_v3> userSearch(@RequestParam(value = "userName") String userName) {
         return userService.userSearchs(userName);
@@ -867,7 +734,7 @@ public class UserControllerNew {
 
     @PutMapping("/forgot_password/{id}")
     public ResponseEntity<Object> forgot_password(@RequestBody Account_user_v3 account_user_v3, @PathVariable int id) {
-        System.out.println(account_user_v3);
+        logger.debug("Updating user password for id: {}", id);
         Optional<Account_user_v3> studentOptional = userRepo.findById(id);
         if (!studentOptional.isPresent()) return ResponseEntity.notFound().build();
         userRepo.save(account_user_v3);
@@ -875,14 +742,18 @@ public class UserControllerNew {
     }
 
     @GetMapping("/userList")
-    public List<Account_user_v3> userList() { return userService.userLists(); }
+    public List<Account_user_v3> userList() {
+        return userService.userLists();
+    }
 
-    @RequestMapping(value = "/addUser", method = RequestMethod.POST)
-    public Account_user_v3 addUser(@RequestBody Account_user_v3 fp) { return userService.addUsers(fp); }
+    @PostMapping("/addUser")
+    public Account_user_v3 addUser(@RequestBody Account_user_v3 fp) {
+        return userService.addUsers(fp);
+    }
 
     @PutMapping("/editUser/{id}")
     public ResponseEntity<Object> editUser(@RequestBody Account_user_v3 account_user_v3, @PathVariable int id) {
-        System.out.println(account_user_v3);
+        logger.debug("Editing user: {}", account_user_v3);
         Optional<Account_user_v3> studentOptional = userRepo.findById(id);
         if (!studentOptional.isPresent()) return ResponseEntity.notFound().build();
         userRepo.save(account_user_v3);
@@ -890,7 +761,9 @@ public class UserControllerNew {
     }
 
     @RequestMapping(value = "/userDelete/{id}", method = RequestMethod.DELETE)
-    public String userDelete(@PathVariable int id) { return userService.userDeletes(id); }
+    public String userDelete(@PathVariable int id) {
+        return userService.userDeletes(id);
+    }
 
     @GetMapping("/userSearchById")
     public List<Account_user_v3> userSearchById(@RequestParam(value = "id") int id) {

@@ -1,0 +1,23 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    
+    
+    {
+      "type": "java",
+      "name": "Debug Spring Boot (launch)",
+      "request": "launch",
+      "mainClass": "com.example.demo.IntuisyzAccountsJavaApplication",
+      "projectName": "DevBe",
+      "console": "integratedTerminal",
+      "vmArgs": "-Dspring.profiles.active=dev -Dlogging.level.org.springframework.web=DEBUG -Dlogging.level.org.hibernate.SQL=DEBUG -Dlogging.level.org.hibernate.orm.jdbc.bind=TRACE"
+    },
+    {
+      "type": "java",
+      "name": "Attach (JDWP 5005)",
+      "request": "attach",
+      "hostName": "localhost",
+      "port": 5005
+    }
+  ]
+}
