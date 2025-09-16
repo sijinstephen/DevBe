@@ -1,23 +1,32 @@
 package com.example.demo.service;
+
 import java.util.List;
+import java.util.stream.Collectors;
+import java.util.stream.StreamSupport;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
-import com.example.demo.model.Invoice;
-import com.example.demo.model.Invoice_template;
 import com.example.demo.model.Profile;
-import com.example.demo.repository.LedgerServiceRepo;
 import com.example.demo.repository.ProfileRepo;
+
 @Service
 public class ProfileService {
-	@Autowired
-	private ProfileRepo profileRepo;
+    private static final Logger logger = LoggerFactory.getLogger(ProfileService.class);
+
+    @Autowired
+    private ProfileRepo profileRepo;
+
     public Profile add_Profiles(Profile fp) {
-    	   profileRepo.save(fp);
-			return null;
-		}
-    public List<Profile> profileData()  {
-    	List<Profile> li=(List<Profile>) profileRepo.profileDatas();
-    	  System.out.println("li "+ li.size());
-    	  return li;
+        logger.info("Adding profile: {}", fp);
+        return profileRepo.save(fp);
+    }
+
+    public List<Profile> profileData() {
+        Iterable<Profile> iterable = profileRepo.findAll();
+        List<Profile> li = StreamSupport.stream(iterable.spliterator(), false)
+                                       .collect(Collectors.toList());
+        logger.info("Fetched profile data, size: {}", li.size());
+        return li;
     }
 }

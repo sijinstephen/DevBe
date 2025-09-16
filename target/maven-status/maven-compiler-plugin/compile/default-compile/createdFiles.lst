@@ -19,6 +19,7 @@ com/example/demo/util/ParseUtil.class
 com/example/demo/repository/GroupServiceRepo.class
 com/example/demo/model/Account_ledger_v3.class
 com/example/demo/repository/ProfileRepo.class
+com/example/demo/controller/UserControllerNew$MultipartFileWrapper.class
 com/example/demo/model/Invoice.class
 com/example/demo/repository/TransactionServiceRepo.class
 com/example/demo/service/ProfileService.class

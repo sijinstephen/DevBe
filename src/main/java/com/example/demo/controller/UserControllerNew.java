@@ -4,14 +4,17 @@ import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.time.LocalDate;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.stream.Collectors;
 import java.net.URLDecoder;
 
 import jakarta.servlet.ServletContext;
@@ -26,8 +29,11 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.lang.NonNull;
 import org.springframework.ui.freemarker.FreeMarkerTemplateUtils;
+import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.CrossOrigin;
+import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -37,6 +43,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestMethod;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 
@@ -62,7 +69,6 @@ import com.example.demo.model.Invoice_sub;
 import com.example.demo.model.Invoice_template;
 import com.example.demo.model.Profile;
 import com.example.demo.repository.GroupServiceRepo;
-import com.example.demo.repository.InvoiceRepo;
 import com.example.demo.repository.InvoiceSubRepo;
 import com.example.demo.repository.LedgerServiceRepo;
 import com.example.demo.repository.ProfileRepo;
@@ -74,11 +80,10 @@ import com.example.demo.service.GroupService;
 import com.example.demo.service.InvoiceService;
 import com.example.demo.service.LedgerService;
 import com.example.demo.service.ProfileService;
-import com.example.demo.service.TemplateService;
 import com.example.demo.service.TransactionService;
 import com.example.demo.service.UserService;
 
-@CrossOrigin(origins = {"http://localhost:5173", "https://your-prod-domain.com"})
+@CrossOrigin(origins = {"http://localhost:5173", "https://your-prod-domain.com"}, maxAge = 3600)
 @RestController
 @RequestMapping("")
 public class UserControllerNew {
@@ -95,9 +100,7 @@ public class UserControllerNew {
     @Autowired private TransactionServiceRepo transactionServiceRepo;
     @Autowired private FileStorageService fileStorageService;
     @Autowired private ServletContext servletContext;
-    @Autowired private InvoiceRepo invoiceRepo;
     @Autowired private InvoiceSubRepo invoiceSubRepo;
-    @Autowired private TemplateService templateService;
     @Autowired private TemplateRepo templateRepo;
     @Autowired private Configuration config;
     @Autowired private ProfileRepo profileRepo;
@@ -131,6 +134,36 @@ public class UserControllerNew {
 
         public void setPassword(String password) {
             this.password = password;
+        }
+    }
+
+    // Global Exception Handler
+    @ExceptionHandler(MissingServletRequestParameterException.class)
+    @ResponseStatus(HttpStatus.BAD_REQUEST)
+    public ResponseEntity<Map<String, Object>> handleMissingParams(MissingServletRequestParameterException ex) {
+        logger.error("Missing required parameter: {}", ex.getParameterName());
+        Map<String, Object> error = new HashMap<>();
+        error.put("error", "Missing required parameter: " + ex.getParameterName());
+        error.put("status", HttpStatus.BAD_REQUEST.value());
+        error.put("timestamp", LocalDate.now().toString());
+        return new ResponseEntity<>(error, HttpStatus.BAD_REQUEST);
+    }
+
+    // Manual date validation
+    private void validateDate(String date, String paramName) {
+        if (date != null && !date.matches("\\d{4}-\\d{2}-\\d{2}")) {
+            throw new IllegalArgumentException("Invalid " + paramName + ": must be in YYYY-MM-DD format");
+        }
+    }
+
+    // Map title values to category IDs
+    private String mapTitleToCategory(String title) {
+        switch (title) {
+            case "6": return "6"; // Direct Income
+            case "7": return "7"; // Primary Income
+            case "8": return "8"; // Direct Expenses
+            case "9": return "9"; // Primary Expenses
+            default: return title;
         }
     }
 
@@ -204,7 +237,7 @@ public class UserControllerNew {
 
     @GetMapping("/grp_by_id")
     public List<Account_group_v3> grp_idSearch(@RequestParam(value = "grpId") String grpId) {
-        return groupService.grp_idSearchSearch(grpId);
+        return groupService.grp_idSearchs(grpId);
     }
 
     @PutMapping("/grp_update/{grpId}")
@@ -226,7 +259,6 @@ public class UserControllerNew {
         return groupService.grp_nameSearchs(grpName);
     }
 
-    // Ledger & Account Transaction
     @PostMapping("/add_ledger")
     public Account_ledger_v3 add_Ledger(@RequestBody Account_ledger_v3 fp) {
         return ledgerService.add_Ledgers(fp);
@@ -266,6 +298,8 @@ public class UserControllerNew {
     @GetMapping("/ledger_bn_date")
     public List<Account_ledger_v3> ledger_bn_date(@RequestParam(value = "start") String start,
                                                   @RequestParam(value = "end") String end) {
+        validateDate(start, "start");
+        validateDate(end, "end");
         return ledgerService.ledger_bn_dates(start, end);
     }
 
@@ -294,7 +328,6 @@ public class UserControllerNew {
         return transactionService.ledger_transaction_searchs(dbt_ac, crdt_ac);
     }
 
-    // Payments
     @GetMapping("/bank_name")
     public List<Account_ledger_v3> bank_name() {
         return ledgerService.bank_names();
@@ -314,6 +347,8 @@ public class UserControllerNew {
     @GetMapping("/payment_bn_date")
     public List<Account_transactions_v3> payment_bn_date(@RequestParam(value = "start") String start,
                                                          @RequestParam(value = "end") String end) {
+        validateDate(start, "start");
+        validateDate(end, "end");
         return transactionService.payment_bn_dates(start, end);
     }
 
@@ -332,7 +367,6 @@ public class UserControllerNew {
         return transactionService.payment_deletes(id);
     }
 
-    // Journal
     @PostMapping("/add_journalTransaction")
     public Account_transactions_v3 add_journalTransaction(@RequestBody Account_transactions_v3 fp) {
         return transactionService.add_journalTransactions(fp);
@@ -352,6 +386,8 @@ public class UserControllerNew {
     @GetMapping("/journal_bn_date")
     public List<Account_transactions_v3> journal_bn_date(@RequestParam(value = "start") String start,
                                                          @RequestParam(value = "end") String end) {
+        validateDate(start, "start");
+        validateDate(end, "end");
         return transactionService.journal_bn_dates(start, end);
     }
 
@@ -374,7 +410,6 @@ public class UserControllerNew {
         return ResponseEntity.noContent().build();
     }
 
-    // Invoice
     @PostMapping("/add_invoice")
     public Invoice add_invoice(@RequestBody Invoice fp) {
         return invoiceService.add_invoices(fp);
@@ -382,7 +417,7 @@ public class UserControllerNew {
 
     @GetMapping("/invoiceData")
     public List<Invoice> invoiceDatas() {
-        return invoiceService.invoiceData();
+        return invoiceService.invoiceDatas();
     }
 
     @GetMapping("/invoiceDataById")
@@ -392,12 +427,12 @@ public class UserControllerNew {
 
     @GetMapping("/invoiceDataOnDashBoard")
     public List<Invoice> invoiceDataOnDashBoards() {
-        return invoiceService.invoiceDataOnDashBoard();
+        return invoiceService.invoiceDataOnDashBoards();
     }
 
     @GetMapping("/invoiceDataByTransactionId")
     public List<Invoice> invoiceDataByTransactionIds(@RequestParam(value = "transactionId") String transactionId) {
-        return invoiceService.invoiceDataByTransactionId(transactionId);
+        return invoiceService.invoiceDataByTransactionIds(transactionId);
     }
 
     @GetMapping("/tran_gen_Search")
@@ -410,7 +445,6 @@ public class UserControllerNew {
         return invoiceService.invoiceDelete(inv_id);
     }
 
-    // Invoice Sub
     @PostMapping("/add_invoice_sub")
     public Invoice_sub add_invoice_sub(@RequestBody Invoice_sub fp) {
         return invoiceService.add_invoice_subs(fp);
@@ -426,7 +460,6 @@ public class UserControllerNew {
         return invoiceService.invoiceSubDelete(inv_id);
     }
 
-    // Dashboard
     @GetMapping("/ac_dashboardCashData")
     public List<Account_ledger_v3> ac_dashboardCashDatas() {
         return ledgerService.ac_dashboardCashData();
@@ -437,34 +470,275 @@ public class UserControllerNew {
         return ledgerService.ac_dashboardBankData();
     }
 
-    // Index Page
+    @GetMapping("/profit_loss")
+    public List<Map<String, Object>> profitLoss(
+            @RequestParam(value = "title") String title,
+            @RequestParam(value = "CompanyName", required = false) String companyName,
+            @RequestParam(value = "CustId", required = false) String custId) {
+        logger.info("Fetching profit/loss data for title: {}, CompanyName: {}, CustId: {}", title, companyName, custId);
+        String category = mapTitleToCategory(title);
+        List<Account_transactions_v3> transactions = transactionService.list_transactions();
+        List<Account_ledger_v3> ledgers = ledgerService.list_ledgers();
+        Map<String, String> ledgerTitles = ledgers.stream()
+                .filter(l -> l.getAc_title() != null)
+                .collect(Collectors.toMap(Account_ledger_v3::getLedger_name, Account_ledger_v3::getAc_title, (v1, v2) -> v1));
+        
+        // Aggregate transactions by ledger_name
+        Map<String, Map<String, Object>> aggregated = new HashMap<>();
+        double totalAmount = 0.0;
+        for (Account_transactions_v3 t : transactions) {
+            String dbtTitle = ledgerTitles.getOrDefault(t.getDbt_ac(), "");
+            String crdtTitle = ledgerTitles.getOrDefault(t.getCrdt_ac(), "");
+            if (category.equals(dbtTitle) || category.equals(crdtTitle)) {
+                String ledgerName = category.equals(dbtTitle) ? t.getDbt_ac() : t.getCrdt_ac();
+                double amount = t.getAmount() != null ? Double.parseDouble(t.getAmount()) : 0.0;
+                totalAmount += amount;
+                aggregated.computeIfAbsent(ledgerName, k -> new HashMap<>()).put("id", t.getTranID());
+                aggregated.get(ledgerName).put("ledger_name", ledgerName);
+                aggregated.get(ledgerName).compute("amount", (k, v) -> v == null ? amount : ((Double)v) + amount);
+            }
+        }
+
+        List<Map<String, Object>> result = aggregated.values().stream()
+                .filter(m -> ((Double)m.get("amount")) != 0)
+                .collect(Collectors.toList());
+        
+        // Add total as branch field in the first item
+        if (!result.isEmpty()) {
+            result.get(0).put("branch", totalAmount);
+        } else {
+            logger.warn("No transactions found for title: {}, CompanyName: {}, CustId: {}", title, companyName, custId);
+            result.add(new HashMap<>(Map.of("id", "0", "ledger_name", "No Data", "amount", 0.0, "branch", 0.0)));
+        }
+        
+        return result;
+    }
+
+    @GetMapping("/profit_loss_bn_date")
+    public List<Map<String, Object>> profitLossBnDate(
+            @RequestParam(value = "title") String title,
+            @RequestParam(value = "CompanyName", required = false) String companyName,
+            @RequestParam(value = "CustId", required = false) String custId,
+            @RequestParam(value = "start", required = false, defaultValue = "2022-04-01") String start,
+            @RequestParam(value = "end", required = false, defaultValue = "2025-09-17") String end) {
+        logger.info("Fetching profit/loss data between dates for title: {}, CompanyName: {}, CustId: {}, start: {}, end: {}", 
+                    title, companyName, custId, start, end);
+        validateDate(start, "start");
+        validateDate(end, "end");
+        String category = mapTitleToCategory(title);
+        List<Account_transactions_v3> transactions = transactionService.payment_bn_dates(start, end);
+        List<Account_ledger_v3> ledgers = ledgerService.list_ledgers();
+        Map<String, String> ledgerTitles = ledgers.stream()
+                .filter(l -> l.getAc_title() != null)
+                .collect(Collectors.toMap(Account_ledger_v3::getLedger_name, Account_ledger_v3::getAc_title, (v1, v2) -> v1));
+        
+        // Aggregate transactions by ledger_name
+        Map<String, Map<String, Object>> aggregated = new HashMap<>();
+        double totalAmount = 0.0;
+        for (Account_transactions_v3 t : transactions) {
+            String dbtTitle = ledgerTitles.getOrDefault(t.getDbt_ac(), "");
+            String crdtTitle = ledgerTitles.getOrDefault(t.getCrdt_ac(), "");
+            if (category.equals(dbtTitle) || category.equals(crdtTitle)) {
+                String ledgerName = category.equals(dbtTitle) ? t.getDbt_ac() : t.getCrdt_ac();
+                double amount = t.getAmount() != null ? Double.parseDouble(t.getAmount()) : 0.0;
+                totalAmount += amount;
+                aggregated.computeIfAbsent(ledgerName, k -> new HashMap<>()).put("id", t.getTranID());
+                aggregated.get(ledgerName).put("ledger_name", ledgerName);
+                aggregated.get(ledgerName).compute("amount", (k, v) -> v == null ? amount : ((Double)v) + amount);
+            }
+        }
+
+        List<Map<String, Object>> result = aggregated.values().stream()
+                .filter(m -> ((Double)m.get("amount")) != 0)
+                .collect(Collectors.toList());
+        
+        // Add total as branch field in the first item
+        if (!result.isEmpty()) {
+            result.get(0).put("branch", totalAmount);
+        } else {
+            logger.warn("No transactions found for title: {}, CompanyName: {}, CustId: {}, start: {}, end: {}", 
+                        title, companyName, custId, start, end);
+            result.add(new HashMap<>(Map.of("id", "0", "ledger_name", "No Data", "amount", 0.0, "branch", 0.0)));
+        }
+        
+        return result;
+    }
+
+    @GetMapping("/balanceSheetProfitLossDataBnDates")
+    public List<Map<String, Object>> balanceSheetProfitLossDataBnDates(
+            @RequestParam(value = "title") String title,
+            @RequestParam(value = "CompanyName", required = false) String companyName,
+            @RequestParam(value = "CustId", required = false) String custId,
+            @RequestParam(value = "start", required = false, defaultValue = "2022-04-01") String start,
+            @RequestParam(value = "end", required = false, defaultValue = "2025-09-17") String end) {
+        logger.info("Fetching balance sheet and P&L data between dates for title: {}, CompanyName: {}, CustId: {}, start: {}, end: {}", 
+                    title, companyName, custId, start, end);
+        validateDate(start, "start");
+        validateDate(end, "end");
+        String category = mapTitleToCategory(title);
+        List<Account_transactions_v3> transactions = transactionService.payment_bn_dates(start, end);
+        List<Account_ledger_v3> ledgers = ledgerService.list_ledgers();
+        Map<String, String> ledgerTitles = ledgers.stream()
+                .filter(l -> l.getAc_title() != null)
+                .collect(Collectors.toMap(Account_ledger_v3::getLedger_name, Account_ledger_v3::getAc_title, (v1, v2) -> v1));
+        
+        // Aggregate transactions by ledger_name
+        Map<String, Map<String, Object>> aggregated = new HashMap<>();
+        double totalAmount = 0.0;
+        for (Account_transactions_v3 t : transactions) {
+            String dbtTitle = ledgerTitles.getOrDefault(t.getDbt_ac(), "");
+            String crdtTitle = ledgerTitles.getOrDefault(t.getCrdt_ac(), "");
+            if (category.equals(dbtTitle) || category.equals(crdtTitle)) {
+                String ledgerName = category.equals(dbtTitle) ? t.getDbt_ac() : t.getCrdt_ac();
+                double amount = t.getAmount() != null ? Double.parseDouble(t.getAmount()) : 0.0;
+                totalAmount += amount;
+                aggregated.computeIfAbsent(ledgerName, k -> new HashMap<>()).put("id", t.getTranID());
+                aggregated.get(ledgerName).put("ledger_name", ledgerName);
+                aggregated.get(ledgerName).compute("amount", (k, v) -> v == null ? amount : ((Double)v) + amount);
+            }
+        }
+
+        List<Map<String, Object>> result = aggregated.values().stream()
+                .filter(m -> ((Double)m.get("amount")) != 0)
+                .collect(Collectors.toList());
+        
+        // Add total as branch field in the first item
+        if (!result.isEmpty()) {
+            result.get(0).put("branch", totalAmount);
+        } else {
+            logger.warn("No transactions found for title: {}, CompanyName: {}, CustId: {}, start: {}, end: {}", 
+                        title, companyName, custId, start, end);
+            result.add(new HashMap<>(Map.of("id", "0", "ledger_name", "No Data", "amount", 0.0, "branch", 0.0)));
+        }
+        
+        return result;
+    }
+
+    @GetMapping("/balanceSheetDataBnDates")
+    public List<Account_ledger_v3> balanceSheetDataBnDates(
+            @RequestParam(value = "title") String title,
+            @RequestParam(value = "CompanyName", required = false) String companyName,
+            @RequestParam(value = "CustId", required = false) String custId,
+            @RequestParam(value = "start", required = false, defaultValue = "2022-04-01") String start,
+            @RequestParam(value = "end", required = false, defaultValue = "2025-09-17") String end) {
+        logger.info("Fetching balance sheet data between dates for title: {}, CompanyName: {}, CustId: {}, start: {}, end: {}", 
+                    title, companyName, custId, start, end);
+        validateDate(start, "start");
+        validateDate(end, "end");
+        return ledgerService.balanceSheetDataBnDates(title, start, end);
+    }
+
+    @GetMapping("/trial_balance")
+    public List<Account_ledger_v3> trialBalance(
+            @RequestParam(value = "acType") String acType,
+            @RequestParam(value = "CompanyName", required = false) String companyName,
+            @RequestParam(value = "CustId", required = false) String custId) {
+        logger.info("Fetching trial balance data for acType: {}, CompanyName: {}, CustId: {}", acType, companyName, custId);
+        return ledgerService.trial_balance(acType);
+    }
+
+    @GetMapping("/trial_balance_total")
+    public String trialBalanceTotal(
+            @RequestParam(value = "CompanyName", required = false) String companyName,
+            @RequestParam(value = "CustId", required = false) String custId) {
+        logger.info("Fetching trial balance total for CompanyName: {}, CustId: {}", companyName, custId);
+        return ledgerService.trial_balance_total();
+    }
+
+    @GetMapping("/trial_balanceBnDates")
+    public List<Account_ledger_v3> trialBalanceBnDates(
+            @RequestParam(value = "acType") String acType,
+            @RequestParam(value = "CompanyName", required = false) String companyName,
+            @RequestParam(value = "CustId", required = false) String custId,
+            @RequestParam(value = "start", required = false, defaultValue = "2022-04-01") String start,
+            @RequestParam(value = "end", required = false, defaultValue = "2025-09-17") String end) {
+        logger.info("Fetching trial balance data for acType: {}, CompanyName: {}, CustId: {}, start: {}, end: {}", 
+                    acType, companyName, custId, start, end);
+        validateDate(start, "start");
+        validateDate(end, "end");
+        return ledgerService.trial_balanceBnDate(acType, start, end);
+    }
+
+    @GetMapping("/trial_balance_totalBnDates")
+    public String trialBalanceTotalBnDates(
+            @RequestParam(value = "CompanyName", required = false) String companyName,
+            @RequestParam(value = "CustId", required = false) String custId,
+            @RequestParam(value = "start", required = false, defaultValue = "2022-04-01") String start,
+            @RequestParam(value = "end", required = false, defaultValue = "2025-09-17") String end) {
+        logger.info("Fetching trial balance total between dates for CompanyName: {}, CustId: {}, start: {}, end: {}", 
+                    companyName, custId, start, end);
+        validateDate(start, "start");
+        validateDate(end, "end");
+        return ledgerService.trial_balance_totalBnDate(start, end);
+    }
+
+    @GetMapping("/updateledgerbalance")
+    public ResponseEntity<String> updateLedgerBalance() {
+        logger.info("Updating ledger balances");
+        try {
+            String result = ledgerService.updateledgerbalance();
+            return ResponseEntity.ok(result);
+        } catch (Exception e) {
+            logger.error("Error updating ledger balances: {}", e.getMessage(), e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body("Failed to update ledger balances: " + e.getMessage());
+        }
+    }
+
+    @GetMapping("/debitAcData")
+    public List<Account_ledger_v3> debitAcData(
+            @RequestParam(value = "CompanyName") String companyName,
+            @RequestParam(value = "CustId") String custId) {
+        logger.info("Fetching debit account data for CompanyName: {}, CustId: {}", companyName, custId);
+        return ledgerService.ledger_name_searchs(companyName);
+    }
+
+    @GetMapping("/creditAcData")
+    public List<Account_ledger_v3> creditAcData(
+            @RequestParam(value = "CompanyName") String companyName,
+            @RequestParam(value = "CustId") String custId) {
+        logger.info("Fetching credit account data for CompanyName: {}, CustId: {}", companyName, custId);
+        return ledgerService.ledger_name_searchs(companyName);
+    }
+
+    @GetMapping("/dayBookData")
+    public List<Account_transactions_v3> dayBookData(
+            @RequestParam(value = "CompanyName") String companyName,
+            @RequestParam(value = "CustId") String custId) {
+        logger.info("Fetching day book data for CompanyName: {}, CustId: {}", companyName, custId);
+        return transactionService.list_transactions();
+    }
+
     @GetMapping("/index_customer_vendorApi")
     public List<Account_ledger_v3> index_customer_vendorApis(@RequestParam(value = "grp") String grp) {
         return ledgerService.index_customer_vendorApi(grp);
     }
 
-    // Migration Date
     @GetMapping("/migrationDateAdd")
     public String migrationDateAdds(@RequestParam(value = "mgrDate") String mgrDate) {
         return ledgerService.migrationDateAdd(mgrDate);
     }
 
-    // Template File Upload
     @PutMapping("/uploadTemplateFile")
-    public ResponseEntity<FileResponse> uploadTemplateFiles(@RequestParam("file") MultipartFile file)
+    public ResponseEntity<FileResponse> uploadTemplateFiles(@RequestParam("file") @NonNull MultipartFile file)
             throws IOException {
         logger.info("Uploading template file: {}", file.getOriginalFilename());
         String originalName = file.getOriginalFilename();
+        if (originalName == null) {
+            logger.error("File has no name");
+            return ResponseEntity.badRequest().body(new FileResponse(null, null, null, 0));
+        }
         String sanitizedName = originalName.replaceAll("\\s+", "-")
                                            .replaceAll("[^a-zA-Z0-9.-]", "")
                                            .toLowerCase();
-        MultipartFile sanitizedFile = new MultipartFileWrapper(file, sanitizedName); // Wrapper to override filename
+        logger.info("Sanitized filename: {}", sanitizedName);
+        MultipartFile sanitizedFile = new MultipartFileWrapper(file, sanitizedName);
         String fileName = fileStorageService.storeFile(sanitizedFile);
         String fileDownloadUri = ServletUriComponentsBuilder.fromCurrentContextPath()
-                .path("/image")
+                .path("/image/")
                 .path(fileName)
                 .toUriString();
-        String folder = "/frontend/public/assets/images/";
+        String folder = "/image/";
         byte[] bytes = file.getBytes();
         Path filePath = Paths.get(folder + sanitizedName);
         Files.write(filePath, bytes);
@@ -472,23 +746,22 @@ public class UserControllerNew {
         return new ResponseEntity<>(fileResponse, HttpStatus.OK);
     }
 
-    // Wrapper class to override MultipartFile filename
     private static class MultipartFileWrapper implements MultipartFile {
-        private final MultipartFile delegate;
-        private final String filename;
+        private final @NonNull MultipartFile delegate;
+        private final @NonNull String filename;
 
-        MultipartFileWrapper(MultipartFile delegate, String filename) {
+        MultipartFileWrapper(@NonNull MultipartFile delegate, @NonNull String filename) {
             this.delegate = delegate;
             this.filename = filename;
         }
 
         @Override
-        public String getName() {
+        public @NonNull String getName() {
             return delegate.getName();
         }
 
         @Override
-        public String getOriginalFilename() {
+        public @NonNull String getOriginalFilename() {
             return filename;
         }
 
@@ -508,12 +781,12 @@ public class UserControllerNew {
         }
 
         @Override
-        public byte[] getBytes() throws IOException {
+        public @NonNull byte[] getBytes() throws IOException {
             return delegate.getBytes();
         }
 
         @Override
-        public InputStream getInputStream() throws IOException {
+        public @NonNull InputStream getInputStream() throws IOException {
             return delegate.getInputStream();
         }
 
@@ -524,8 +797,17 @@ public class UserControllerNew {
     }
 
     @GetMapping("/templateData")
-    public List<Invoice_template> templateDatas() {
-        return templateService.templateData();
+    public List<Invoice_template> templateDatas(
+            @RequestParam(value = "CompanyName", required = false) String companyName,
+            @RequestParam(value = "CustId", required = false) String custId) {
+        logger.info("Fetching template data for CompanyName: {}, CustId: {}", companyName, custId);
+        List<Invoice_template> templates = templateRepo.templateDatas();
+        if (companyName != null) {
+            return templates.stream()
+                    .filter(t -> companyName.equals(t.getTemplate_companyName()))
+                    .collect(Collectors.toList());
+        }
+        return templates;
     }
 
     @PutMapping("/template_update/{template_Id}")
@@ -551,7 +833,7 @@ public class UserControllerNew {
         File file = new File("/image/" + sanitizedName);
         if (!file.exists()) {
             logger.warn("File not found: /image/{}", sanitizedName);
-            return ResponseEntity.notFound().build();
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
         }
         InputStreamResource resource = new InputStreamResource(new FileInputStream(file));
         return ResponseEntity.ok()
@@ -562,17 +844,18 @@ public class UserControllerNew {
     }
 
     @GetMapping("/invoicePdfDownload")
-    public HttpEntity<byte[]> invoicePdfDownloads(@RequestParam(value = "invDate") String invDate,
-                                                  @RequestParam(value = "invNo") String invNo,
-                                                  @RequestParam(value = "gstNo") String gstNo,
-                                                  @RequestParam(value = "billAddress") String billAddress,
-                                                  @RequestParam(value = "place_of_supply") String place_of_supply,
-                                                  @RequestParam(value = "igstAmnt") String igstAmnt,
-                                                  @RequestParam(value = "cgstAmnt") String cgstAmnt,
-                                                  @RequestParam(value = "sgstAmnt") String sgstAmnt,
-                                                  @RequestParam(value = "totalTaxAmnt") String totalTaxAmnt,
-                                                  @RequestParam(value = "totalAmnt") String totalAmnt,
-                                                  @RequestParam(value = "hsn") String hsn)
+    public HttpEntity<byte[]> invoicePdfDownloads(
+            @RequestParam(value = "invDate") String invDate,
+            @RequestParam(value = "invNo") String invNo,
+            @RequestParam(value = "gstNo") String gstNo,
+            @RequestParam(value = "billAddress") String billAddress,
+            @RequestParam(value = "place_of_supply") String place_of_supply,
+            @RequestParam(value = "igstAmnt") String igstAmnt,
+            @RequestParam(value = "cgstAmnt") String cgstAmnt,
+            @RequestParam(value = "sgstAmnt") String sgstAmnt,
+            @RequestParam(value = "totalTaxAmnt") String totalTaxAmnt,
+            @RequestParam(value = "totalAmnt") String totalAmnt,
+            @RequestParam(value = "hsn") String hsn)
             throws IOException, TemplateException {
         logger.info("Generating PDF for invoice: invNo={}", invNo);
         Map<String, Object> model = new HashMap<>();
@@ -588,7 +871,7 @@ public class UserControllerNew {
         model.put("totalAmnt", totalAmnt);
         model.put("hsn", hsn);
 
-        List<Invoice> li = invoiceRepo.invoiceData();
+        List<Invoice> li = invoiceService.invoiceDatas();
         int lastInvId = 0;
         if (li.size() > 0) {
             int lastId = li.size() - 1;
@@ -602,20 +885,20 @@ public class UserControllerNew {
         List<Invoice_template> li5 = templateRepo.templateDatas();
         if (li5.size() > 0) {
             String payTo = li5.get(0).getTemplate_payTo();
-            String[] payToArray = payTo.split("\\r?\\n");
+            String[] payToArray = payTo != null ? payTo.split("\\r?\\n") : new String[]{};
             String cName = li5.get(0).getTemplate_companyName();
             String cAddress = li5.get(0).getTemplate_companyAddress();
             String cContact = li5.get(0).getTemplate_companyContact();
             String name = li5.get(0).getTemplate_Name();
             String logoImg = li5.get(0).getTemplate_logo();
             String signImg = li5.get(0).getTemplate_sig();
-            model.put("templateCompanyName", cName.split("\\r?\\n"));
-            model.put("templateCompanyAddress", cAddress.split("\\r?\\n"));
-            model.put("templateCompanyContact", cContact.split("\\r?\\n"));
-            model.put("templateName", name.split("\\r?\\n"));
+            model.put("templateCompanyName", cName != null ? cName.split("\\r?\\n") : new String[]{});
+            model.put("templateCompanyAddress", cAddress != null ? cAddress.split("\\r?\\n") : new String[]{});
+            model.put("templateCompanyContact", cContact != null ? cContact.split("\\r?\\n") : new String[]{});
+            model.put("templateName", name != null ? name.split("\\r?\\n") : new String[]{});
             model.put("templateData", payToArray);
-            model.put("templateLogo", logoImg);
-            model.put("templateSign", signImg);
+            model.put("templateLogo", logoImg != null ? logoImg.replaceAll("\\s+", "-").replaceAll("[^a-zA-Z0-9.-]", "").toLowerCase() : "");
+            model.put("templateSign", signImg != null ? signImg.replaceAll("\\s+", "-").replaceAll("[^a-zA-Z0-9.-]", "").toLowerCase() : "");
         }
 
         Template t = config.getTemplate("email-template-new.ftl");
@@ -631,20 +914,26 @@ public class UserControllerNew {
     }
 
     @GetMapping("/invoicePdfDownloadDashboard")
-    public HttpEntity<byte[]> invoicePdfDownloadsDashboard(@RequestParam(value = "inv_id") int inv_id,
-                                                           @RequestParam(value = "invDate") String invDate,
-                                                           @RequestParam(value = "invNo") String invNo,
-                                                           @RequestParam(value = "gstNo") String gstNo,
-                                                           @RequestParam(value = "billAddress") String billAddress,
-                                                           @RequestParam(value = "place_of_supply") String place_of_supply,
-                                                           @RequestParam(value = "igstAmnt") String igstAmnt,
-                                                           @RequestParam(value = "cgstAmnt") String cgstAmnt,
-                                                           @RequestParam(value = "sgstAmnt") String sgstAmnt,
-                                                           @RequestParam(value = "totalTaxAmnt") String totalTaxAmnt,
-                                                           @RequestParam(value = "totalAmnt") String totalAmnt,
-                                                           @RequestParam(value = "hsn") String hsn)
+    public HttpEntity<byte[]> invoicePdfDownloadsDashboard(
+            @RequestParam(value = "inv_id") int inv_id,
+            @RequestParam(value = "invDate") String invDate,
+            @RequestParam(value = "invNo") String invNo,
+            @RequestParam(value = "gstNo") String gstNo,
+            @RequestParam(value = "billAddress") String billAddress,
+            @RequestParam(value = "place_of_supply") String place_of_supply,
+            @RequestParam(value = "igstAmnt") String igstAmnt,
+            @RequestParam(value = "cgstAmnt") String cgstAmnt,
+            @RequestParam(value = "sgstAmnt") String sgstAmnt,
+            @RequestParam(value = "totalTaxAmnt") String totalTaxAmnt,
+            @RequestParam(value = "totalAmnt") String totalAmnt,
+            @RequestParam(value = "hsn") String hsn,
+            @RequestParam(value = "CompanyName") String companyName,
+            @RequestParam(value = "CustId") String custId,
+            @RequestParam(value = "ifsc") String ifsc,
+            @RequestParam(value = "swift_code") String swift_code,
+            @RequestParam(value = "gstId") String gstId)
             throws IOException, TemplateException {
-        logger.info("Generating PDF for dashboard invoice: inv_id={}", inv_id);
+        logger.info("Generating PDF for dashboard invoice: inv_id={}, CompanyName={}, CustId={}", inv_id, companyName, custId);
         Map<String, Object> model = new HashMap<>();
         model.put("invDate", invDate);
         model.put("invNo", invNo);
@@ -657,6 +946,9 @@ public class UserControllerNew {
         model.put("totalTaxAmnt", totalTaxAmnt);
         model.put("totalAmnt", totalAmnt);
         model.put("hsn", hsn);
+        model.put("ifsc", ifsc);
+        model.put("swift_code", swift_code);
+        model.put("gstId", gstId);
 
         List<Invoice_sub> li1 = invoiceSubRepo.invoiceSubDataById(Integer.toString(inv_id));
         if (li1.size() > 0) {
@@ -664,22 +956,29 @@ public class UserControllerNew {
         }
 
         List<Invoice_template> li5 = templateRepo.templateDatas();
+        if (companyName != null) {
+            li5 = li5.stream()
+                     .filter(t -> companyName.equals(t.getTemplate_companyName()))
+                     .collect(Collectors.toList());
+        }
         if (li5.size() > 0) {
             String payTo = li5.get(0).getTemplate_payTo();
-            String[] payToArray = payTo.split("\\r?\\n");
+            String[] payToArray = payTo != null ? payTo.split("\\r?\\n") : new String[]{};
             String cName = li5.get(0).getTemplate_companyName();
             String cAddress = li5.get(0).getTemplate_companyAddress();
             String cContact = li5.get(0).getTemplate_companyContact();
             String name = li5.get(0).getTemplate_Name();
             String logoImg = li5.get(0).getTemplate_logo();
             String signImg = li5.get(0).getTemplate_sig();
-            model.put("templateCompanyName", cName.split("\\r?\\n"));
-            model.put("templateCompanyAddress", cAddress.split("\\r?\\n"));
-            model.put("templateCompanyContact", cContact.split("\\r?\\n"));
-            model.put("templateName", name.split("\\r?\\n"));
+            model.put("templateCompanyName", cName != null ? cName.split("\\r?\\n") : new String[]{});
+            model.put("templateCompanyAddress", cAddress != null ? cAddress.split("\\r?\\n") : new String[]{});
+            model.put("templateCompanyContact", cContact != null ? cContact.split("\\r?\\n") : new String[]{});
+            model.put("templateName", name != null ? name.split("\\r?\\n") : new String[]{});
             model.put("templateData", payToArray);
-            model.put("templateLogo", logoImg);
-            model.put("templateSign", signImg);
+            model.put("templateLogo", logoImg != null ? logoImg.replaceAll("\\s+", "-").replaceAll("[^a-zA-Z0-9.-]", "").toLowerCase() : "");
+            model.put("templateSign", signImg != null ? signImg.replaceAll("\\s+", "-").replaceAll("[^a-zA-Z0-9.-]", "").toLowerCase() : "");
+        } else {
+            logger.warn("No template found for CompanyName: {}", companyName);
         }
 
         Template t = config.getTemplate("email-template-new.ftl");
@@ -694,7 +993,6 @@ public class UserControllerNew {
         return new HttpEntity<>(baos.toByteArray(), header);
     }
 
-    // Helper: HTML -> PDF using iText 7 html2pdf
     private ByteArrayOutputStream generatePdf(String html) {
         ByteArrayOutputStream baos = new ByteArrayOutputStream();
         try {
@@ -706,15 +1004,23 @@ public class UserControllerNew {
         }
     }
 
-    // Profile Page
     @PostMapping("/add_profile")
     public Profile add_Profile(@RequestBody Profile fp) {
         return profileService.add_Profiles(fp);
     }
 
     @GetMapping("/profileData")
-    public List<Profile> profileDatas() {
-        return profileService.profileData();
+    public List<Profile> profileDatas(
+            @RequestParam(value = "CompanyName", required = false) String companyName,
+            @RequestParam(value = "CustId", required = false) String custId) {
+        logger.info("Fetching profile data for CompanyName: {}, CustId: {}", companyName, custId);
+        List<Profile> profiles = profileService.profileData();
+        if (companyName != null && custId != null) {
+            return profiles.stream()
+                           .filter(p -> companyName.equals(p.getOrganization_name()) && custId.equals(p.getCompany_id()))
+                           .collect(Collectors.toList());
+        }
+        return profiles;
     }
 
     @PutMapping("/profile_update/{organization_id}")
@@ -726,7 +1032,6 @@ public class UserControllerNew {
         return ResponseEntity.noContent().build();
     }
 
-    // User Management
     @GetMapping("/userSearch")
     public List<Account_user_v3> userSearch(@RequestParam(value = "userName") String userName) {
         return userService.userSearchs(userName);
