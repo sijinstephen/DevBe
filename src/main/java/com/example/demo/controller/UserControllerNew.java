@@ -338,6 +338,12 @@ public class UserControllerNew {
         return transactionService.list_transactions();
     }
 
+    @GetMapping("/list_receipt")
+    public List<Account_transactions_v3> list_receipt() {
+        logger.info("Fetching receipt transactions");
+        return transactionService.list_receipts();
+    }
+
     @GetMapping("/transaction_sorting")
     public List<Account_transactions_v3> transaction_sort(@RequestParam(value = "field") String field,
                                                           @RequestParam(value = "type") String type) {
