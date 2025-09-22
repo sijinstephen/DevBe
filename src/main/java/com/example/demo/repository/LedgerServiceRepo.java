@@ -133,4 +133,7 @@ List<Account_ledger_v3> cashBookOpenBalanceDataBnDate(int id,  String start ,Str
 String ss38="select * from account_ledger_v3 where id = ?1 ";
 @Query(nativeQuery =true, value=ss38)
 Account_ledger_v3 ledger_Search_MigrationDate(int ledgerId);
+
+
 }
+

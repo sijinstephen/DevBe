@@ -620,20 +620,19 @@ public class UserControllerNew {
         return result;
     }
 
-    @GetMapping("/balanceSheetDataBnDates")
-    public List<Account_ledger_v3> balanceSheetDataBnDates(
-            @RequestParam(value = "title") String title,
+    @GetMapping("/balanceSheet")
+    public List<Account_ledger_v3> balanceSheet(
             @RequestParam(value = "CompanyName", required = false) String companyName,
             @RequestParam(value = "CustId", required = false) String custId,
             @RequestParam(value = "start", required = false, defaultValue = "2022-04-01") String start,
             @RequestParam(value = "end", required = false, defaultValue = "2025-09-17") String end) {
-        logger.info("Fetching balance sheet data between dates for title: {}, CompanyName: {}, CustId: {}, start: {}, end: {}", 
-                    title, companyName, custId, start, end);
+        logger.info("Fetching balance sheet for CompanyName: {}, CustId: {}, start: {}, end: {}", 
+                    companyName, custId, start, end);
         validateDate(start, "start");
         validateDate(end, "end");
-        return ledgerService.balanceSheetDataBnDates(title, start, end);
+        return ledgerService.balanceSheet(start, end);
     }
-
+ 
     @GetMapping("/trial_balance")
     public List<Account_ledger_v3> trialBalance(
             @RequestParam(value = "acType") String acType,

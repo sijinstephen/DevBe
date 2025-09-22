@@ -444,6 +444,50 @@ public class LedgerService {
     // ---------------------------------------------------------------------
 
     @SuppressWarnings("unchecked")
+    public List<Account_ledger_v3> balanceSheet(String Start, String end) {
+        log.debug("balanceSheet start={} end={}", Start, end);
+        String start = Start;
+
+        double fixedLiabilityTotal = 0d;
+        List<Account_ledger_v3> ledgersAssets = (List<Account_ledger_v3>) ledgerServiceRepo.trial_balances("1");
+        List<Account_ledger_v3> ledgersLiabilities = (List<Account_ledger_v3>) ledgerServiceRepo.trial_balances("2");
+        List   <Account_ledger_v3> ledgers = ledgersAssets;
+        ledgers.addAll(ledgersLiabilities);
+        if (!ledgers.isEmpty()) {
+            for (Account_ledger_v3 l : ledgers) {
+                double debitTotal = 0d;
+                double creditTotal = 0d;
+                double balance = 0d;
+
+                if (!"0".equals(l.getAmount()) && !"".equals(l.getAmount())) {
+                    int id = l.getId();
+                    String idStr = Integer.toString(id);
+
+                    @SuppressWarnings("unchecked")
+                    List<Account_transactions_v3> txs =
+                        (List<Account_transactions_v3>) transactionServiceRepo.selectBalanceSheetDataBnDates(id, start, end);
+
+                    for (Account_transactions_v3 t : txs) {
+                        if (idStr.equals(t.getDbt_ac())) {
+                            debitTotal += parseNum(t.getAmount());
+                        }
+                        if (idStr.equals(t.getCrdt_ac())) {
+                            creditTotal += parseNum(t.getAmount());
+                        }
+                    }
+
+                    balance = Math.abs(debitTotal - creditTotal);
+                    fixedLiabilityTotal += balance;
+                    l.setAmount(ds(balance));
+                }
+            }
+            ledgers.get(0).setBranch(ds(fixedLiabilityTotal)); // legacy: sum in first.branch
+        }
+
+        return ledgers;
+    }
+
+     @SuppressWarnings("unchecked")
     public List<Account_ledger_v3> balanceSheetDataBnDates(String title, String Start, String end) {
         log.debug("balanceSheetDataBnDates title={} start={} end={}", title, Start, end);
         String start = Start;
@@ -484,6 +528,7 @@ public class LedgerService {
 
         return ledgers;
     }
+
 
     @SuppressWarnings("unchecked")
     public List<Account_ledger_v3> balanceSheetProfitLossDataBnDates(String title, String start, String end) {
