@@ -358,6 +358,19 @@ public class UserControllerNew {
         return transactionService.payment_bn_dates(start, end);
     }
 
+    @GetMapping("/transactions_account_bn_date")
+    public List<Account_transactions_v3> transactions_account_bn_date
+         (
+        @RequestParam(value = "ledger") int ledger,
+        @RequestParam(value = "start") String start,
+        @RequestParam(value = "end") String end) 
+        {
+        validateDate(start, "start");
+        validateDate(end, "end");
+        return transactionService.View_Account_Statement(ledger,start, end);
+    }
+
+
     @GetMapping("/transaction_search")
     public List<Account_transactions_v3> transaction_search(@RequestParam(value = "transactionId") String transactionId) {
         return transactionService.transaction_searchs(transactionId);
@@ -714,6 +727,7 @@ public class UserControllerNew {
         return transactionService.list_transactions();
     }
 
+    
     @GetMapping("/index_customer_vendorApi")
     public List<Account_ledger_v3> index_customer_vendorApis(@RequestParam(value = "grp") String grp) {
         return ledgerService.index_customer_vendorApi(grp);

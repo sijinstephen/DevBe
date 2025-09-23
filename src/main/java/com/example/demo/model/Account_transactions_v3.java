@@ -211,4 +211,5 @@ public class Account_transactions_v3 {
 	public void setDebit_blnc_bfore_txn(String debit_blnc_bfore_txn) {
 		this.debit_blnc_bfore_txn = debit_blnc_bfore_txn;
 	}
+	
 }

@@ -1290,4 +1290,13 @@ public class TransactionService {
     public List<Account_transactions_v3> tran_gen_Search(String tran_gen_id) {
         return transactionServiceRepo.tran_gen_Search(tran_gen_id);
     }
+
+    public List<Account_transactions_v3> View_Account_Statement(int ledgerId, String start, String end) {
+        log.debug("View Statement ledgerId={} {}..{}", ledgerId, start, end);
+        List<Account_transactions_v3> txs =
+            transactionServiceRepo.selectAccStmtTransaction2BndatesNoDesc(ledgerId, start, end);
+        return txs;
+    }
+
 }
+ 

@@ -391,4 +391,7 @@ List<Account_transactions_v3> tran_gen_Search(String tran_gen_id);
 String ss126="select * from account_transactions_v3 where (dbt_ac=?1 OR crdt_ac=?1) AND description=?2 ORDER BY created_date,created_time";
 @Query(nativeQuery =true, value=ss126)
 List<Account_transactions_v3> transactionFilter(int id, String description);
+String ss127="select * from account_transactions_v3 where tran_Date BETWEEN ?2 AND ?3 AND (dbt_ac=?1 OR crdt_ac=?1)  ORDER BY tran_Date";
+@Query(nativeQuery =true, value=ss127)
+List<Account_transactions_v3> selectAccStmtTransaction2BndatesNoDesc(int id, String start, String end);
 }
