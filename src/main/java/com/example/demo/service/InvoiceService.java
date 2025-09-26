@@ -104,4 +104,21 @@ public class InvoiceService {
         invoiceRepo.deleteById(inv_id);
         return "Deleted successfully";
     }
+public Invoice update_invoices(Invoice fp) {
+    logger.info("Updating invoice: {}", fp.getInv_id());
+    // enforce existence
+     invoiceRepo.findById(fp.getInv_id())
+             .orElseThrow(() -> new IllegalArgumentException("Invoice not found: " + fp.getInv_id()));
+    return invoiceRepo.save(fp);
+}
+
+public Invoice_sub update_invoice_sub(Invoice_sub sub) {
+    // JPA save() updates when id exists
+    return invoiceSubRepo.save(sub);
+}
+
+public void delete_invoice_sub(int inv_sub_id) {
+    invoiceSubRepo.deleteById(inv_sub_id);
+}
+
 }

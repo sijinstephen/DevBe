@@ -1093,4 +1093,52 @@ public class UserControllerNew {
     public List<Account_user_v3> userSearchById(@RequestParam(value = "id") int id) {
         return userService.userSearchByIds(id);
     }
+// New API to update invoice and return updated object with 200 status
+
+    @PutMapping("/invoice_update/{inv_id}")
+public ResponseEntity<Invoice> invoiceUpdate(
+        @PathVariable int inv_id,
+        @RequestBody Invoice body
+) {
+    // ensure path param wins
+    body.setInv_id(inv_id);
+
+    // do the update
+    Invoice saved = invoiceService.update_invoices(body);
+
+    // return 200 with the updated header
+    return ResponseEntity.ok(saved);
+}
+// Invoice sub update and delete APIs
+
+@PutMapping("/invoice_sub/{inv_sub_id}")
+public ResponseEntity<Invoice_sub> updateInvoiceSub(
+        @PathVariable int inv_sub_id,
+        @RequestBody Invoice_sub body
+) {
+    // load existing; 404 if not found
+    Invoice_sub existing = invoiceSubRepo.findById(inv_sub_id)
+        .orElseThrow(() -> new org.springframework.web.server.ResponseStatusException(
+                org.springframework.http.HttpStatus.NOT_FOUND,
+                "invoice_sub not found: " + inv_sub_id));
+
+    // update mutable fields only (keep original created_date/time if you prefer)
+    existing.setInv_id(body.getInv_id() != null ? body.getInv_id() : existing.getInv_id());
+    existing.setDescription(body.getDescription() != null ? body.getDescription() : existing.getDescription());
+    existing.setHsn(body.getHsn() != null ? body.getHsn() : existing.getHsn());
+    existing.setQty(body.getQty() != null ? body.getQty() : existing.getQty());
+    existing.setAmount(body.getAmount() != null ? body.getAmount() : existing.getAmount());
+    existing.setTax(body.getTax() != null && !body.getTax().isEmpty() ? body.getTax() : (existing.getTax() != null ? existing.getTax() : "0"));
+    existing.setRemarks(body.getRemarks() != null ? body.getRemarks() : existing.getRemarks());
+
+    // OPTIONAL: only if you truly want to overwrite timestamps
+    if (body.getCreated_date() != null) existing.setCreated_date(body.getCreated_date());
+    if (body.getCreated_time() != null) existing.setCreated_time(body.getCreated_time());
+
+    Invoice_sub saved = invoiceSubRepo.save(existing);
+    return ResponseEntity.ok(saved);
+}
+
+
+
 }
