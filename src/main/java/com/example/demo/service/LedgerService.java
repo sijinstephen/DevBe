@@ -669,10 +669,16 @@ public class LedgerService {
         for (Account_ledger_v3 l : list) {
             Account_ledger_v3 upd = ledgerServiceRepo.ledger_Search_MigrationDate(l.getId());
             upd.setLedger_date(mgrDate);
-            ledgerServiceRepo.save(upd);
+            ledgerServiceRepo.save(upd); 
         }
         return "Added";
     }
+
+      @SuppressWarnings("unchecked")
+    public List<Account_ledger_v3> ledger_listAll() {
+        return (List<Account_ledger_v3>) ledgerServiceRepo.ledger_listAll();
+    }
+
 
     // small util
     private static int parseIntSafe(String s, int fallback) {

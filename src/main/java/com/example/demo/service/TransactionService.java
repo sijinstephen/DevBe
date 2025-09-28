@@ -1184,9 +1184,22 @@ public class TransactionService {
     }
 
     // ---------------------------------------------------------------------
+    // Transaction History (No filters)
+    // ---------------------------------------------------------------------
+
+    public List<Account_transactions_v3> transactionHistory_full() {
+        log.debug("txnHistory Full");
+        List<Account_transactions_v3> li = transactionServiceRepo.transactionDate();
+        return li;
+    }
+
+
+  
+    // ---------------------------------------------------------------------
     // Transaction History (filters)
     // ---------------------------------------------------------------------
 
+  
     public List<Account_transactions_v3> transactionHistory_searchs(String start, String end,
                                                                     String debit, String credit,
                                                                     String field, String val) {

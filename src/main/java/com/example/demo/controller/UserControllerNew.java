@@ -284,6 +284,12 @@ public class UserControllerNew {
         return transactionService.transactionDates();
     }
 
+    @GetMapping("/txHistoryFull")
+    public List<Account_transactions_v3> txHistoryFull() {
+        return transactionService.transactionHistory_full();
+    }
+
+    
     @GetMapping("/list_ledger")
     public List<Account_ledger_v3> list_ledger() {
         return ledgerService.list_ledgers();
@@ -701,6 +707,12 @@ public class UserControllerNew {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                     .body("Failed to update ledger balances: " + e.getMessage());
         }
+    }
+
+     @GetMapping("/listAllAccounts")
+    public List<Account_ledger_v3> listAllAccounts(){
+        logger.info("Fetching all accounts");
+        return ledgerService.ledger_listAll();
     }
 
     @GetMapping("/debitAcData")
