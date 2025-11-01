@@ -1,7 +1,13 @@
 /Users/sijin-mini/DevBe/src/main/java/com/example/demo/IntuisyzAccountsJavaApplication.java
 /Users/sijin-mini/DevBe/src/main/java/com/example/demo/config/LoggingFilter.java
 /Users/sijin-mini/DevBe/src/main/java/com/example/demo/config/SecurityConfig.java
-/Users/sijin-mini/DevBe/src/main/java/com/example/demo/controller/UserControllerNew.java
+/Users/sijin-mini/DevBe/src/main/java/com/example/demo/controller/common/GeneralController.java
+/Users/sijin-mini/DevBe/src/main/java/com/example/demo/controller/dashboard/DashboardController.java
+/Users/sijin-mini/DevBe/src/main/java/com/example/demo/controller/invoice/InvoiceController.java
+/Users/sijin-mini/DevBe/src/main/java/com/example/demo/controller/ledger/LedgerController.java
+/Users/sijin-mini/DevBe/src/main/java/com/example/demo/controller/report/ReportController.java
+/Users/sijin-mini/DevBe/src/main/java/com/example/demo/controller/transaction/TransactionController.java
+/Users/sijin-mini/DevBe/src/main/java/com/example/demo/controller/user/UserController.java
 /Users/sijin-mini/DevBe/src/main/java/com/example/demo/email/api/config/ApiConfig.java
 /Users/sijin-mini/DevBe/src/main/java/com/example/demo/email/api/dto/MailRequest.java
 /Users/sijin-mini/DevBe/src/main/java/com/example/demo/email/api/dto/MailResponse.java
