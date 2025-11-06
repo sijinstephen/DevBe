@@ -103,6 +103,7 @@ public class InvoiceController {
         return invoiceService.invoiceDataByIds(invoiceId);
     }
 
+ 
     @GetMapping("/invoiceDataOnDashBoard")
     public List<Invoice> invoiceDataOnDashBoards() {
         return invoiceService.invoiceDataOnDashBoards();

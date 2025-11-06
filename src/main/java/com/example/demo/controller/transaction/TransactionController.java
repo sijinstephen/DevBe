@@ -96,8 +96,6 @@ public class TransactionController {
     private static final Logger logger = LoggerFactory.getLogger(ReportController.class);
 
  
-
-
     @GetMapping("/ledger_transaction_search")
     public List<Account_transactions_v3> ledger_transaction_search(@RequestParam(value = "dbt_ac") String dbt_ac,
                                                                    @RequestParam(value = "crdt_ac") String crdt_ac) {

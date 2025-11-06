@@ -26,6 +26,19 @@ public class InvoiceService {
     @Autowired
     private LedgerServiceRepo ledgerServiceRepo;
 
+
+        private Integer toIntOrNull(String s) {
+            if (s == null) return null;
+            String t = s.trim();
+            if (t.isEmpty() || "null".equalsIgnoreCase(t)) return null;
+            try { return Integer.valueOf(t); } catch (NumberFormatException e) { return null; }
+        }
+
+        private String trimSafe(String s) {
+            return s == null ? null : s.trim();
+        }
+
+
     public Invoice add_invoices(Invoice fp) {
         logger.info("Adding invoice: {}", fp);
         return invoiceRepo.save(fp);
@@ -49,6 +62,42 @@ public class InvoiceService {
             List<Account_ledger_v3> li1;
             List<Account_ledger_v3> li2;
             for (int i = 0; i < li.size(); i++) {
+
+        Invoice inv = li.get(i);
+
+        // ---- Customer: treat value as ID only if it is numeric ----
+        Integer custId = toIntOrNull(inv.getCust_name());
+        if (custId != null) {
+            try {
+                List<Account_ledger_v3> custLedgers = ledgerServiceRepo.getLedgers(custId);
+                if (custLedgers != null && !custLedgers.isEmpty()) {
+                    inv.setCust_name(trimSafe(custLedgers.get(0).getLedger_name()));
+                }
+            } catch (Exception e) {
+                logger.warn("Could not resolve customer by id {} for inv_id {}", custId, inv.getInv_id(), e);
+            }
+        } else {
+            // it's a name (or null). Keep whatever came from DB. Just trim trailing spaces.
+            inv.setCust_name(trimSafe(inv.getCust_name()));
+        }
+
+        // ---- Service: treat value as ID only if it is numeric ----
+        Integer svcId = toIntOrNull(inv.getService());
+        if (svcId != null) {
+            try {
+                List<Account_ledger_v3> svcLedgers = ledgerServiceRepo.getLedgers(svcId);
+                if (svcLedgers != null && !svcLedgers.isEmpty()) {
+                    // If your dashboard wants the service NAME, map it; else keep id as string:
+                    inv.setService(trimSafe(svcLedgers.get(0).getLedger_name()));
+                }
+            } catch (Exception e) {
+                logger.warn("Could not resolve service by id {} for inv_id {}", svcId, inv.getInv_id(), e);
+            }
+        } else {
+            // already a name like "consulting" or null. Just trim; don't parse.
+            inv.setService(trimSafe(inv.getService()));
+        }
+/*
                 try {
                     li1 = ledgerServiceRepo.getLedgers(Integer.parseInt(li.get(i).getCust_name()));
                     li2 = ledgerServiceRepo.getLedgers(Integer.parseInt(li.get(i).getService()));
@@ -61,6 +110,8 @@ public class InvoiceService {
                 } catch (NumberFormatException e) {
                     logger.error("Invalid cust_name or service ID: {}", li.get(i), e);
                 }
+*/
+
             }
         }
         return li;

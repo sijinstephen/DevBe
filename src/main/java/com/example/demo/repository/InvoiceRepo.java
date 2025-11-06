@@ -12,6 +12,7 @@ public interface InvoiceRepo extends CrudRepository<Invoice,Integer>{
 	@Query(nativeQuery =true, value=ss2)
 	List<Invoice> invoiceDataById(int invoiceId);
 	String ss3="select * from invoice where invoice_tran_id = ?1 ";
+    List<Invoice> findAll = null;
 	@Query(nativeQuery =true, value=ss3)
 	List<Invoice> invoiceDataByTransactionId(String transactionId);
 }
