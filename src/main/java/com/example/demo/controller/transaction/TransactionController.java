@@ -213,6 +213,10 @@ public class TransactionController {
         public List<Account_transactions_v3> transactionDate() {
             return transactionService.transactionDates();
         }
+                @GetMapping("/txHistoryFull")
+        public List<Account_transactions_v3> txHistoryFull() {
+            return transactionService.transactionHistory_full();
+        }
 
 }
 
