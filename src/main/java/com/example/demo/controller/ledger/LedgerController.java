@@ -121,6 +121,12 @@ public class LedgerController {
         }
     }
 
+    @GetMapping("/listBankAccounts")
+    public List<Account_ledger_v3> listBankAccounts(){
+        logger.info("Fetching Bank accounts");
+        return ledgerService.bankDatas();
+    }
+
      @GetMapping("/listAllAccounts")
     public List<Account_ledger_v3> listAllAccounts(){
         logger.info("Fetching all accounts");
@@ -141,6 +147,14 @@ public class LedgerController {
         logger.info("Fetching credit account data for CompanyName: {}, CustId: {}", companyName, custId);
         return ledgerService.ledger_name_searchs(companyName);
     }
+         @GetMapping("/ledger_name_search")
+        public List<Account_ledger_v3> ledger_name_search(@RequestParam(value = "ledgerName") String ledgerName) {
+            return ledgerService.ledger_name_searchs(ledgerName);
+        }
+        @PostMapping("/add_ledger")
+        public Account_ledger_v3 add_Ledger(@RequestBody Account_ledger_v3 fp) {
+            return ledgerService.add_Ledgers(fp);
+        }
         
     @GetMapping("/list_ledger")
     public List<Account_ledger_v3> list_ledger() {

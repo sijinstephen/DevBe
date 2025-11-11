@@ -21,6 +21,7 @@ import jakarta.servlet.ServletContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.InputStreamResource;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
@@ -71,6 +72,9 @@ public class InvoiceController {
     private final FileStorageService fileStorageService;
     private final ServletContext servletContext;
     private final Configuration config;
+
+    @Value("${app.file.static-dir:./image/}")
+    private String staticFileDir;
 
     @Autowired
     public InvoiceController(
@@ -171,8 +175,9 @@ public class InvoiceController {
     @PutMapping("/uploadTemplateFile")
     public ResponseEntity<FileResponse> uploadTemplateFiles(@RequestParam("file") @NonNull MultipartFile file)
             throws IOException {
-        logger.info("Uploading template file: {}", file.getOriginalFilename());
         String originalName = file.getOriginalFilename();
+        logger.info("Uploading template file: {}", originalName != null ? originalName : "unknown");
+
         if (originalName == null) {
             logger.error("File has no original name");
             return ResponseEntity.badRequest().body(new FileResponse(null, null, null, 0));
@@ -181,15 +186,28 @@ public class InvoiceController {
         String sanitizedName = sanitizeAssetName(originalName);
         MultipartFile sanitizedFile = new MultipartFileWrapper(file, sanitizedName);
 
-        String fileName = fileStorageService.storeFile(sanitizedFile);
+        // Ensure static directory exists
+        Path staticDirPath = Paths.get(staticFileDir);
+        Files.createDirectories(staticDirPath);
+
+        // Log before storage
+        logger.info("Storing sanitized file: {} (size: {} bytes)", sanitizedName, sanitizedFile.getSize());
+
+        String fileName;
+        try {
+            fileName = fileStorageService.storeFile(sanitizedFile);
+            logger.info("File stored successfully as: {} at location: {}", fileName, staticFileDir);
+        } catch (Exception e) {
+            logger.error("Failed to store file {}: {}", sanitizedName, e.getMessage(), e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(new FileResponse(null, null, "Storage failed", 0));
+        }
+
         String fileDownloadUri = ServletUriComponentsBuilder.fromCurrentContextPath()
                 .path("/image/")
                 .path(fileName)
                 .toUriString();
-
-        byte[] bytes = file.getBytes();
-        Path filePath = Paths.get("/image/").resolve(sanitizedName);
-        Files.write(filePath, bytes);
+        logger.info(fileDownloadUri);
 
         FileResponse response = new FileResponse(fileName, fileDownloadUri, file.getContentType(), file.getSize());
         return new ResponseEntity<>(response, HttpStatus.OK);
@@ -203,7 +221,7 @@ public class InvoiceController {
         List<Invoice_template> templates = templateRepo.templateDatas();
         if (companyName != null) {
             return templates.stream()
-                    .filter(t -> companyName.equals(t.getTemplate_companyName()))
+  //                  .filter(t -> companyName.equals(t.getTemplate_companyName()))
                     .collect(Collectors.toList());
         }
         return templates;
@@ -223,14 +241,21 @@ public class InvoiceController {
     @GetMapping("/invoiceImgFetch")
     public ResponseEntity<InputStreamResource> invoiceImgFetchs(@RequestParam("fileName") String fileName)
             throws IOException {
-        logger.info("Fetching invoice image: {}", fileName);
-        String decodedName = URLDecoder.decode(fileName, StandardCharsets.UTF_8.name());
+        logger.info("Fetching invoice image: {}", fileName != null ? fileName : "unknown");
+        String decodedName = URLDecoder.decode(fileName != null ? fileName : "", StandardCharsets.UTF_8.name());
         String sanitizedName = sanitizeAssetName(decodedName);
 
         MediaType mediaType = MediaTypeUtils.getMediaTypeForFileName(this.servletContext, sanitizedName);
-        File file = new File("/image/" + sanitizedName);
+        if (mediaType == null) {
+            mediaType = MediaType.APPLICATION_OCTET_STREAM;  // Fallback for unknown types
+        }
+
+        // Use configured path instead of hardcoded /image/
+        File file = new File(staticFileDir + sanitizedName);
+        logger.info("{} :: {}", file.getName(), mediaType);
+
         if (!file.exists()) {
-            logger.warn("File not found: /image/{}", sanitizedName);
+            logger.warn("File not found: {}/{}", staticFileDir, sanitizedName);
             return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
         }
 
@@ -382,7 +407,7 @@ public class InvoiceController {
         try {
             HtmlConverter.convertToPdf(html, baos);
         } catch (Exception e) {
-            logger.error("Error generating PDF: {}", e.getMessage(), e);
+            logger.error("Error generating PDF: {}", e.getMessage() != null ? e.getMessage() : "Unknown error", e);
         }
         return baos;
     }

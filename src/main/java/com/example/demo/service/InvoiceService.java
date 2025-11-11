@@ -49,6 +49,11 @@ public class InvoiceService {
         return invoiceSubRepo.save(fp);
     }
 
+    public Invoice recieve_invoice_payment(Invoice invoice) {
+        logger.info("Receiving invoice payment: {}", invoice);
+        return invoiceRepo.save(invoice);
+    }
+
     public List<Invoice> invoiceDatas() {
         List<Invoice> li = invoiceRepo.invoiceData();
         logger.info("Fetched invoice data, size: {}", li.size());

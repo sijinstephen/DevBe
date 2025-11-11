@@ -4,6 +4,7 @@
 /Users/sijin-mini/DevBe/src/main/java/com/example/demo/controller/common/GeneralController.java
 /Users/sijin-mini/DevBe/src/main/java/com/example/demo/controller/dashboard/DashboardController.java
 /Users/sijin-mini/DevBe/src/main/java/com/example/demo/controller/invoice/InvoiceController.java
+/Users/sijin-mini/DevBe/src/main/java/com/example/demo/controller/invoice/PaymentReceiveController.java
 /Users/sijin-mini/DevBe/src/main/java/com/example/demo/controller/ledger/LedgerController.java
 /Users/sijin-mini/DevBe/src/main/java/com/example/demo/controller/report/ReportController.java
 /Users/sijin-mini/DevBe/src/main/java/com/example/demo/controller/transaction/TransactionController.java

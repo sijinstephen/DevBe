@@ -1,0 +1,205 @@
+package com.example.demo.controller.invoice;
+
+import com.example.demo.model.Account_ledger_v3;
+import com.example.demo.model.Account_transactions_v3;
+import com.example.demo.model.Invoice;
+import com.example.demo.repository.InvoiceRepo;
+import com.example.demo.repository.LedgerServiceRepo;
+import com.example.demo.service.InvoiceService;
+import com.example.demo.service.TransactionService;
+import org.springframework.http.ResponseEntity;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.bind.annotation.*;
+
+import java.math.BigDecimal;
+import java.time.LocalDate;
+import java.time.LocalTime;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+@CrossOrigin(origins = {"http://localhost:5173"})
+@RestController
+//@RequestMapping("/invoicePaymentsReceiver")
+
+
+
+public class PaymentReceiveController {
+
+    private final TransactionService transactionService;
+    private final InvoiceRepo invoiceRepo;
+    private final InvoiceService invoiceService;
+    private final LedgerServiceRepo ledgerRepo;
+
+    public PaymentReceiveController(TransactionService transactionService,
+                                    InvoiceRepo invoiceRepo,
+                                    InvoiceService invoiceService,
+                                    LedgerServiceRepo ledgerRepo) {
+        this.transactionService = transactionService;
+        this.invoiceRepo = invoiceRepo;
+        this.invoiceService = invoiceService;
+        this.ledgerRepo = ledgerRepo;
+    }
+
+    /**
+     * Consolidated endpoint: receive a payment and settle A/R using existing services only.
+     * Reuses:
+     *   - transactionService.add_journalTransactions(...)
+     *   - invoiceService.update_invoices(invoice)
+     *
+     * Accepts screen params as request params (no DTOs):
+     *   inv_id, amount, date (yyyy-MM-dd), mode ("BANK"|"CASH"),
+     *   bank_ledger_id (required if BANK), customer_ledger_id (optional),
+     *   reference, notes (optional)
+     */
+//    @PostMapping("/invoicePaymentsReceiver")
+    @PostMapping(
+        path = "/invoicePaymentsReceiver",
+        consumes = org.springframework.http.MediaType.APPLICATION_FORM_URLENCODED_VALUE,
+        produces = org.springframework.http.MediaType.APPLICATION_JSON_VALUE
+    )
+
+    @Transactional
+    public ResponseEntity<?> receive(
+            @RequestParam("inv_id") Integer invId,
+            @RequestParam("amount") String amountStr,
+            @RequestParam(value = "date", required = false) String dateStr,
+            @RequestParam("mode") String mode,
+            @RequestParam(value = "bank_ledger_id", required = false) String bankLedgerId,
+            @RequestParam(value = "customer_ledger_id", required = false) String customerLedgerId,
+            @RequestParam(value = "reference", required = false) String reference,
+            @RequestParam(value = "notes", required = false) String notes
+    ) {
+        // --- parse & validate ---
+        if (invId == null) return ResponseEntity.badRequest().body("inv_id is required");
+        if (amountStr == null || amountStr.trim().isEmpty()) return ResponseEntity.badRequest().body("amount is required");
+
+        BigDecimal amount = toBD(amountStr);
+        if (amount.signum() <= 0) return ResponseEntity.badRequest().body("amount must be > 0");
+
+        final LocalDate payDate = (dateStr == null || dateStr.isBlank()) ? LocalDate.now() : LocalDate.parse(dateStr);
+        final String modeU = mode == null ? "" : mode.trim().toUpperCase();
+        final boolean isBank = "BANK".equals(modeU);
+
+        // --- load invoice ---
+        Invoice invoice = invoiceRepo.findById(invId)
+                .orElseThrow(() -> new IllegalArgumentException("Invoice not found: " + invId));
+
+        // --- resolve ledgers ---
+        final String arCustomerId = resolveCustomerLedgerId(invoice, customerLedgerId);
+        final String debitLedgerId = isBank
+                ? requireLedgerId(bankLedgerId, "bank_ledger_id required for BANK mode")
+                : resolveDefaultCashId();
+
+        // --- JOURNAL: Dr Bank/Cash ---
+        Account_transactions_v3 dr = new Account_transactions_v3();
+        dr.setTran_Date(payDate.toString());
+        dr.setCreatedDate(payDate.toString());
+        dr.setCreatedTime(LocalTime.now().toString());
+        dr.setDbt_ac(debitLedgerId);
+        dr.setCrdt_ac("0");
+        dr.setAmount(amount.toPlainString());   // direction implied by dbt_ac
+        dr.setType("Journal");
+        dr.setMode(isBank ? "bank" : "cash");
+        // Optionally persist reference in existing text fields if you already use them:
+        // dr.setChq_no(safe(reference));
+        // dr.setChq_date(payDate.toString());
+        transactionService.add_journalTransactions(dr);
+
+        // --- JOURNAL: Cr Customer (A/R) ---
+        Account_transactions_v3 cr = new Account_transactions_v3();
+        cr.setTran_Date(payDate.toString());
+        cr.setCreatedDate(payDate.toString());
+        cr.setCreatedTime(LocalTime.now().toString());
+        cr.setDbt_ac("0");
+        cr.setCrdt_ac(arCustomerId);
+        cr.setAmount(amount.toPlainString());   // direction implied by crdt_ac
+        cr.setType("Journal");
+        cr.setMode(isBank ? "bank" : "cash");
+        // cr.setChq_no(safe(reference));
+        // cr.setChq_date(payDate.toString());
+        transactionService.add_journalTransactions(cr);
+
+        // --- Update invoice.amount_received (string fields) via existing service ---
+        BigDecimal prevReceived = toBD(getString(invoice.getAmount_received()));
+        BigDecimal newReceived  = prevReceived.add(amount);
+        invoice.setAmount_received(newReceived.toPlainString());
+
+        // Let your existing service compute & persist status/due as it already does
+        Invoice saved = invoiceService.update_invoices(invoice);
+
+        // --- Response ---
+        Map<String, Object> resp = new HashMap<>();
+        resp.put("success", true);
+        resp.put("invoice_id", invId);
+        resp.put("amount_received", saved.getAmount_received());
+        try { resp.put("status", saved.getStatus()); } catch (Exception ignore) {}
+        return ResponseEntity.ok(resp);
+    }
+
+    // --------------------------- helpers ---------------------------
+
+    private String requireLedgerId(String maybeIdOrName, String err) {
+        if (maybeIdOrName == null || maybeIdOrName.trim().isEmpty()) {
+            throw new IllegalArgumentException(err);
+        }
+        return toLedgerId(maybeIdOrName.trim());
+    }
+
+    private String resolveCustomerLedgerId(Invoice inv, String overrideIdOrName) {
+        // 1) screen override
+        if (overrideIdOrName != null && !overrideIdOrName.isBlank()) {
+            return toLedgerId(overrideIdOrName.trim());
+        }
+        // 2) try common invoice getters in this codebase: cust_id / cust_name
+        try {
+            Object maybeId = inv.getClass().getMethod("getCust_id").invoke(inv);
+            if (maybeId != null && !"null".equals(String.valueOf(maybeId))) {
+                return toLedgerId(String.valueOf(maybeId));
+            }
+        } catch (Exception ignore) {}
+        try {
+            Object maybeName = inv.getClass().getMethod("getCust_name").invoke(inv);
+            if (maybeName != null && !String.valueOf(maybeName).isBlank()) {
+                return toLedgerId(String.valueOf(maybeName));
+            }
+        } catch (Exception ignore) {}
+        throw new IllegalArgumentException("Unable to resolve customer ledger for invoice " + invIdSafe(inv));
+    }
+
+    private String toLedgerId(String idOrName) {
+        // If numeric, accept as id; else resolve first match by name using your existing repo method
+        try {
+            Integer id = Integer.valueOf(idOrName);
+            return id.toString();
+        } catch (NumberFormatException ignore) {
+            List<Account_ledger_v3> found = ledgerRepo.ledger_name_search(idOrName);
+            if (found == null || found.isEmpty())
+                throw new IllegalArgumentException("Ledger not found: " + idOrName);
+            return String.valueOf(found.get(0).getId());
+        }
+    }
+
+    private String resolveDefaultCashId() {
+        // Adjust if your Cash ledger uses a different name (e.g., "Cash in Hand")
+        List<Account_ledger_v3> list = ledgerRepo.ledger_name_search("Cash");
+        if (list == null || list.isEmpty())
+            throw new IllegalStateException("Default CASH ledger not configured");
+        return String.valueOf(list.get(0).getId());
+    }
+
+    private static BigDecimal toBD(String s) {
+        if (s == null || s.trim().isEmpty()) return BigDecimal.ZERO;
+        return new BigDecimal(s.replace(",", "").trim());
+    }
+
+    private static String getString(String s) { return s == null ? "" : s; }
+
+    @SuppressWarnings("unused")
+    private static String safe(String s) { return s == null ? "" : s.trim(); }
+
+    private static String invIdSafe(Invoice inv) {
+        try { return String.valueOf(inv.getClass().getMethod("getInv_id").invoke(inv)); }
+        catch (Exception ignore) { return "(unknown)"; }
+    }
+}
