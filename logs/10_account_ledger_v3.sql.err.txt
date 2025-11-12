@@ -1,1 +1,0 @@
-ERROR 1044 (42000) at line 1: Access denied for user 'accUser'@'localhost' to database 'devbe'
