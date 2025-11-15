@@ -6,10 +6,12 @@ import com.example.demo.model.Invoice;
 import com.example.demo.repository.InvoiceRepo;
 import com.example.demo.repository.LedgerServiceRepo;
 import com.example.demo.service.InvoiceService;
-import com.example.demo.service.TransactionService;
+//import com.example.demo.service.TransactionService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
+import com.example.demo.service.InvoiceTransactionsService;
+
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -26,21 +28,24 @@ import java.util.Map;
 
 public class PaymentReceiveController {
 
-    private final TransactionService transactionService;
+//    private final TransactionService transactionService;
     private final InvoiceRepo invoiceRepo;
     private final InvoiceService invoiceService;
     private final LedgerServiceRepo ledgerRepo;
+    private final InvoiceTransactionsService invoiceTransactionsService;
 
-    public PaymentReceiveController(TransactionService transactionService,
+    public PaymentReceiveController(
                                     InvoiceRepo invoiceRepo,
                                     InvoiceService invoiceService,
-                                    LedgerServiceRepo ledgerRepo) {
-        this.transactionService = transactionService;
+                                    LedgerServiceRepo ledgerRepo,
+                                    InvoiceTransactionsService invoiceTransactionsService ) {
+
         this.invoiceRepo = invoiceRepo;
         this.invoiceService = invoiceService;
         this.ledgerRepo = ledgerRepo;
+        this.invoiceTransactionsService= invoiceTransactionsService;
     }
-
+ 
     /**
      * Consolidated endpoint: receive a payment and settle A/R using existing services only.
      * Reuses:
@@ -91,8 +96,11 @@ public class PaymentReceiveController {
                 ? requireLedgerId(bankLedgerId, "bank_ledger_id required for BANK mode")
                 : resolveDefaultCashId();
 
-        // --- JOURNAL: Dr Bank/Cash ---
-        Account_transactions_v3 dr = new Account_transactions_v3();
+      
+                // --- JOURNAL: Dr Bank/Cash ---
+        Account_transactions_v3 dr = new Account_transactions_v3(   
+
+        );
         dr.setTran_Date(payDate.toString());
         dr.setCreatedDate(payDate.toString());
         dr.setCreatedTime(LocalTime.now().toString());
@@ -104,21 +112,22 @@ public class PaymentReceiveController {
         // Optionally persist reference in existing text fields if you already use them:
         // dr.setChq_no(safe(reference));
         // dr.setChq_date(payDate.toString());
-        transactionService.add_journalTransactions(dr);
 
-        // --- JOURNAL: Cr Customer (A/R) ---
-        Account_transactions_v3 cr = new Account_transactions_v3();
-        cr.setTran_Date(payDate.toString());
-        cr.setCreatedDate(payDate.toString());
-        cr.setCreatedTime(LocalTime.now().toString());
-        cr.setDbt_ac("0");
-        cr.setCrdt_ac(arCustomerId);
-        cr.setAmount(amount.toPlainString());   // direction implied by crdt_ac
-        cr.setType("Journal");
-        cr.setMode(isBank ? "bank" : "cash");
-        // cr.setChq_no(safe(reference));
-        // cr.setChq_date(payDate.toString());
-        transactionService.add_journalTransactions(cr);
+invoiceTransactionsService.invoicePaymentReceive( 
+        Long.valueOf(invId),
+        Long.valueOf(debitLedgerId),
+        Long.valueOf(arCustomerId),
+        amount,
+        payDate,
+        reference,
+        notes,
+        "system",   // createdBy
+        "default_company", // company
+        "default_branch",  // branch
+        isBank ? "bank" : "cash"
+);
+
+
 
         // --- Update invoice.amount_received (string fields) via existing service ---
         BigDecimal prevReceived = toBD(getString(invoice.getAmount_received()));

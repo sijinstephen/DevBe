@@ -1,0 +1,31 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://intuisyz.com/schemas/InvoicePayment.schema.json",
+  "title": "InvoicePayment",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["inv_id", "amount", "mode"],
+  "properties": {
+    "inv_id":        { "type": "integer" },
+    "amount":        { "type": "number", "exclusiveMinimum": 0 },
+    "mode":          { "type": "string", "enum": ["BANK", "CASH"] },
+
+    "bank_ledger_id": { "type": ["integer", "null"] },
+    "date":           { "type": ["string", "null"], "format": "date" },
+    "reference":      { "type": ["string", "null"], "maxLength": 120 },
+    "notes":          { "type": ["string", "null"], "maxLength": 1000 }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "mode": { "const": "BANK" }
+        },
+        "required": ["mode"]
+      },
+      "then": {
+        "required": ["bank_ledger_id"]
+      }
+    }
+  ]
+}
