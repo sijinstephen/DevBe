@@ -1,8 +1,10 @@
 /Users/sijin-mini/DevBe/src/main/java/com/example/demo/repository/AcTypeRepo.java
+/Users/sijin-mini/DevBe/src/main/java/com/example/demo/service/DefaultsService.java
 /Users/sijin-mini/DevBe/src/main/java/com/example/demo/repository/InvoiceRepo.java
 /Users/sijin-mini/DevBe/src/main/java/com/example/demo/email/api/dto/MailResponse.java
 /Users/sijin-mini/DevBe/src/main/java/com/example/demo/model/Profile.java
 /Users/sijin-mini/DevBe/src/main/java/com/example/demo/repository/UserRepo.java
+/Users/sijin-mini/DevBe/src/main/java/com/example/demo/controller/DefaultsController.java
 /Users/sijin-mini/DevBe/src/main/java/com/example/demo/service/InvoiceService.java
 /Users/sijin-mini/DevBe/src/main/java/com/example/demo/repository/TransactionServiceRepo.java
 /Users/sijin-mini/DevBe/src/main/java/com/example/demo/model/Account_transactions_v3.java
@@ -38,6 +40,7 @@
 /Users/sijin-mini/DevBe/src/main/java/com/example/demo/controller/transaction/TransactionController.java
 /Users/sijin-mini/DevBe/src/main/java/com/example/demo/model/Account_group_v3.java
 /Users/sijin-mini/DevBe/src/main/java/com/example/demo/model/Invoice_sub.java
+/Users/sijin-mini/DevBe/src/main/java/com/example/demo/model/Defaults.java
 /Users/sijin-mini/DevBe/src/main/java/com/example/demo/util/ParseUtil.java
 /Users/sijin-mini/DevBe/src/main/java/com/example/demo/email/api/config/ApiConfig.java
 /Users/sijin-mini/DevBe/src/main/java/com/example/demo/validation/SchemaRegistry.java
@@ -48,6 +51,7 @@
 /Users/sijin-mini/DevBe/src/main/java/com/example/demo/controller/common/GeneralController.java
 /Users/sijin-mini/DevBe/src/main/java/com/example/demo/service/UserService.java
 /Users/sijin-mini/DevBe/src/main/java/com/example/demo/model/Account_type_v3.java
+/Users/sijin-mini/DevBe/src/main/java/com/example/demo/repository/DefaultsRepo.java
 /Users/sijin-mini/DevBe/src/main/java/com/example/demo/model/Account_ledger_v3.java
 /Users/sijin-mini/DevBe/src/main/java/com/example/demo/controller/report/ReportController.java
 /Users/sijin-mini/DevBe/src/main/java/com/example/demo/fileService/FileStorageProperties.java
