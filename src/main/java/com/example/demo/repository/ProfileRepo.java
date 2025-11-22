@@ -8,4 +8,9 @@ public interface ProfileRepo extends CrudRepository<Profile,Integer>{
 String ss3="select * from profile";
 	@Query(nativeQuery =true, value=ss3)
 	List<Profile> profileDatas();
+String ss4="select * from profile where company_name = ?1 and customer_name = ?2 ";
+	@Query(nativeQuery =true, value=ss3)
+	List<Profile> defaultProfileDatas(String company, String customer);
+
+
 }

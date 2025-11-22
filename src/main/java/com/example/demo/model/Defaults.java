@@ -15,8 +15,13 @@ public class Defaults {
     private String default_income_account;
     private String default_expense_account;
 
-    // ✅ New field: default cash account
+    // existing
     private String default_cash_account;
+
+    // 🔹 new fields
+    private String default_company_name;
+    private String default_customer_name;
+    private String default_currency;
 
     public Defaults() {
     }
@@ -53,12 +58,37 @@ public class Defaults {
         this.default_expense_account = default_expense_account;
     }
 
-    // ✅ Getter/setter for new cash account field
     public String getDefault_cash_account() {
         return default_cash_account;
     }
 
     public void setDefault_cash_account(String default_cash_account) {
         this.default_cash_account = default_cash_account;
+    }
+
+    // 🔹 getters/setters for new fields
+
+    public String getDefault_company_name() {
+        return default_company_name;
+    }
+
+    public void setDefault_company_name(String default_company_name) {
+        this.default_company_name = default_company_name;
+    }
+
+    public String getDefault_customer_name() {
+        return default_customer_name;
+    }
+
+    public void setDefault_customer_name(String default_customer_name) {
+        this.default_customer_name = default_customer_name;
+    }
+
+    public String getDefault_currency() {
+        return default_currency;
+    }
+
+    public void setDefault_currency(String default_currency) {
+        this.default_currency = default_currency;
     }
 }

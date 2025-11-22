@@ -51,7 +51,7 @@ import freemarker.template.Template;
 import freemarker.template.TemplateException;
 
 import com.itextpdf.html2pdf.HtmlConverter;
-
+import com.example.demo.dto.MessageProfile;
 import com.example.demo.email.api.dto.MailRequest;
 import com.example.demo.email.api.dto.MailResponse;
 import com.example.demo.email.api.service.EmailService;
@@ -63,6 +63,7 @@ import com.example.demo.model.Account_ledger_v3;
 import com.example.demo.model.Account_title_v3;
 import com.example.demo.model.Account_transactions_v3;
 import com.example.demo.model.Account_user_v3;
+import com.example.demo.model.Defaults;
 import com.example.demo.model.Invoice;
 import com.example.demo.model.Invoice_sub;
 import com.example.demo.model.Invoice_template;
@@ -81,6 +82,8 @@ import com.example.demo.service.LedgerService;
 import com.example.demo.service.ProfileService;
 import com.example.demo.service.TransactionService;
 import com.example.demo.service.UserService;
+import com.example.demo.dto.MessageProfile;
+import com.example.demo.model.Profile;
 
 @CrossOrigin(origins = {"http://localhost:5173", "https://your-prod-domain.com"}, maxAge = 3600)
 @RestController
@@ -226,10 +229,18 @@ public class GeneralController {
         logger.info("Fetching profile data for CompanyName: {}, CustId: {}", companyName, custId);
         List<Profile> profiles = profileService.profileData();
         if (companyName != null && custId != null) {
-            return profiles.stream()
+            logger.info("Profle data found. Attempting to fetch company profile data.",profiles);
+                        return profiles.stream()
                            .filter(p -> companyName.equals(p.getOrganization_name()) && custId.equals(p.getCompany_id()))
                            .collect(Collectors.toList());
+
         }
+        if (profiles.isEmpty()|| profiles==null) 
+        {
+            logger.info("No profile data found. Attempting to fetch default profile data.");
+            profiles = profileService.defaultProfileData();
+            logger.info("Default Profile data found. Attempting to fetch default profile data.",profiles.size());
+        }   
         return profiles;
     }
 
@@ -241,5 +252,60 @@ public class GeneralController {
         profileRepo.save(profile);
         return ResponseEntity.noContent().build();
     }
+
+    @GetMapping("/profileDataNew")
+public MessageProfile getProfileData(
+        @RequestParam("CompanyName") String companyName,
+        @RequestParam("CustId") String custId) {
+
+    // ✅ Typed list instead of Object
+    List<Profile> list = profileService.getProfileData(companyName, custId);
+
+    MessageProfile msg = MessageProfile.newReadMessage();
+    MessageProfile.Payload payload = msg.payload;
+
+    // If nothing found, return empty-but-valid message
+    if (list == null || list.isEmpty()) {
+        return msg;
+    }
+
+    Profile p = list.get(0);  // ✅ Profile, not Object
+
+    // 🔹 Map entity → JSON-schema payload
+// ------------ ORGANIZATION ------------
+payload.organization.organization_name = p.getOrganization_name();
+payload.organization.industry           = p.getIndustry();
+payload.organization.street1            = p.getStreet1();
+payload.organization.street2            = p.getStreet2();
+payload.organization.city               = p.getCity();
+payload.organization.state              = p.getState();
+payload.organization.zip                = p.getZip();
+
+// ------------ BANKING ------------
+payload.banking.ifsc   = p.getIfsc();
+payload.banking.acc_no = p.getAcc_no();
+payload.banking.bank   = p.getBank();
+payload.banking.branch = p.getBranch();
+
+// ------------ GST ------------
+payload.gst.gst_id = p.getGst_id();
+
+// ------------ CONTACT ------------
+payload.contact.phone   = p.getPhone();
+payload.contact.website = p.getWebsite();
+payload.contact.gmail   = p.getGmail();
+
+// ------------ META ------------
+payload.meta.signatory_name        = p.getSignatory_name();
+payload.meta.signatory_designation = p.getSignatory_designation();
+payload.meta.company_name          = p.getCompany_id();      // ✔ correct field
+payload.meta.cust_id               = String.valueOf(p.getOrganization_id()); // ✔ correct field
+payload.meta.fiscal_year           = p.getFiscal_year();
+payload.meta.date_format           = p.getDate_format();
+
+    return msg;
+}
+
+
 
 }
