@@ -27,6 +27,12 @@ public class ProfileService {
         return profileRepo.save(fp);
     }
 
+    public Profile update_Profiles(Profile fp) {
+        logger.info("Updating profile: {}", fp);
+        return profileRepo.save(fp);
+    }
+
+
 public List<Profile> getProfileData(String companyName, String custId) {
 
     Iterable<Profile> iterable =
@@ -51,7 +57,7 @@ public List<Profile> getProfileData(String companyName, String custId) {
         return li;
     }
 
-        public List<Profile> defaultProfileData() 
+    public List<Profile> defaultProfileData() 
         {
              // 🔹 Get Default company 
                 Defaults defaults = null;

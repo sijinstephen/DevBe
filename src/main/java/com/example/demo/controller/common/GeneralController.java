@@ -306,6 +306,70 @@ payload.meta.date_format           = p.getDate_format();
     return msg;
 }
 
+@PutMapping("/profileUpdateNew/{organization_id}")
+public ResponseEntity<Object> profile_updates_new(@RequestBody MessageProfile msg,
+                                                  @PathVariable int organization_id) {
+
+    Optional<Profile> studentOptional = profileRepo.findById(organization_id);
+    if (!studentOptional.isPresent()) {
+        return ResponseEntity.notFound().build();
+    }
+
+    Profile p = studentOptional.get();
+    MessageProfile.Payload payload = msg.payload; // <-- use incoming payload
+
+    if (payload == null) {
+        // nothing to update; you can return 400 or just no-content
+        return ResponseEntity.badRequest().body("Payload is missing");
+    }
+
+    // 🔄 Map JSON-schema payload → entity p
+    // You can keep this simple first (full replace):
+
+    // ------------ ORGANIZATION ------------
+    if (payload.organization != null) {
+        p.setOrganization_name(payload.organization.organization_name);
+        p.setIndustry(payload.organization.industry);
+        p.setStreet1(payload.organization.street1);
+        p.setStreet2(payload.organization.street2);
+        p.setCity(payload.organization.city);
+        p.setState(payload.organization.state);
+        p.setZip(payload.organization.zip);
+    }
+
+    // ------------ BANKING ------------
+    if (payload.banking != null) {
+        p.setIfsc(payload.banking.ifsc);
+        p.setAcc_no(payload.banking.acc_no);
+        p.setBank(payload.banking.bank);
+        p.setBranch(payload.banking.branch);
+    }
+
+    // ------------ GST ------------
+    if (payload.gst != null) {
+        p.setGst_id(payload.gst.gst_id);
+    }
+
+    // ------------ CONTACT ------------
+    if (payload.contact != null) {
+        p.setPhone(payload.contact.phone);
+        p.setWebsite(payload.contact.website);
+        p.setGmail(payload.contact.gmail);
+    }
+
+    // ------------ META ------------
+    if (payload.meta != null) {
+        p.setSignatory_name(payload.meta.signatory_name);
+        p.setSignatory_designation(payload.meta.signatory_designation);
+        p.setCompany_id(payload.meta.company_name);
+        p.setFiscal_year(payload.meta.fiscal_year);
+        p.setDate_format(payload.meta.date_format);
+        // NOTE: organization_id is from path variable, so we don't touch it here
+    }
+
+    profileRepo.save(p);
+    return ResponseEntity.noContent().build();
+}
 
 
 }
