@@ -184,6 +184,16 @@ public class TransactionService {
         }
         return li;
     }
+    // ---------------------------------------------------------------------
+    // Profit-Loss
+    // ---------------------------------------------------------------------
+
+    public List<Account_transactions_v3> list_all_transactions() {
+        List<Account_transactions_v3> li = transactionServiceRepo.listAllTransactions();
+         log.debug("list_all_transactions: Transaction Count {}", li.size());
+        return li;
+    }
+
 
     public List<Account_transactions_v3> transaction_sorts(String field, String type) {
         log.debug("transaction_sorts {} {}", field, type);

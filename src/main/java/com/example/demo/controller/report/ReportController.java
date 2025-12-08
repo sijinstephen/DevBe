@@ -46,47 +46,102 @@ public class ReportController {
         return new ResponseEntity<>(error, HttpStatus.BAD_REQUEST);
     }
 
-    @GetMapping("/profit_loss")
-    public List<Map<String, Object>> profitLoss(
-            @RequestParam("title") String title,
-            @RequestParam(value = "CompanyName", required = false) String companyName,
-            @RequestParam(value = "CustId", required = false) String custId) {
-        logger.info("Fetching profit/loss data for title: {}, CompanyName: {}, CustId: {}", title, companyName, custId);
-        String category = mapTitleToCategory(title);
-        List<Account_transactions_v3> transactions = transactionService.list_transactions();
-        List<Account_ledger_v3> ledgers = ledgerService.list_ledgers();
-        Map<String, String> ledgerTitles = ledgers.stream()
-                .filter(l -> l.getAc_title() != null)
-                .collect(Collectors.toMap(Account_ledger_v3::getLedger_name, Account_ledger_v3::getAc_title, (v1, v2) -> v1));
+@GetMapping("/profit_loss")
+public List<Map<String, Object>> profitLoss(
+        @RequestParam("title") String title,
+        @RequestParam(value = "CompanyName", required = false) String companyName,
+        @RequestParam(value = "CustId", required = false) String custId) {
 
-        Map<String, Map<String, Object>> aggregated = new HashMap<>();
-        double totalAmount = 0.0;
-        for (Account_transactions_v3 t : transactions) {
-            String dbtTitle = ledgerTitles.getOrDefault(t.getDbt_ac(), "");
-            String crdtTitle = ledgerTitles.getOrDefault(t.getCrdt_ac(), "");
-            if (category.equals(dbtTitle) || category.equals(crdtTitle)) {
-                String ledgerName = category.equals(dbtTitle) ? t.getDbt_ac() : t.getCrdt_ac();
-                double amount = t.getAmount() != null ? Double.parseDouble(t.getAmount()) : 0.0;
-                totalAmount += amount;
-                aggregated.computeIfAbsent(ledgerName, k -> new HashMap<>()).put("id", t.getTranID());
-                aggregated.get(ledgerName).put("ledger_name", ledgerName);
-                aggregated.get(ledgerName).compute("amount", (k, v) -> v == null ? amount : ((Double) v) + amount);
+    logger.info("Fetching profit/loss data for title: {}, CompanyName: {}, CustId: {}",
+            title, companyName, custId);
+
+    // ✅ Use the title directly as the category, because ac_title in ledger is "6","7","8","9",...
+    String category = title.trim();
+
+    // You can switch back to your list_all_transactions() if that’s what you want.
+    List<Account_transactions_v3> transactions = transactionService.list_all_transactions();
+    List<Account_ledger_v3> ledgers = ledgerService.list_ledgers();
+
+    // 🔑 ID → ac_title (as String)
+    Map<String, String> ledgerIdToTitle = ledgers.stream()
+            .filter(l -> l.getAc_title() != null)
+            .collect(Collectors.toMap(
+                    l -> String.valueOf(l.getId()),
+                    l -> String.valueOf(l.getAc_title()),
+                    (v1, v2) -> v1
+            ));
+
+    // 🔑 ID → ledger_name
+    Map<String, String> ledgerIdToName = ledgers.stream()
+            .collect(Collectors.toMap(
+                    l -> String.valueOf(l.getId()),
+                    Account_ledger_v3::getLedger_name,
+                    (v1, v2) -> v1
+            ));
+
+    Map<String, Map<String, Object>> aggregated = new HashMap<>();
+    double totalAmount = 0.0;
+
+    for (Account_transactions_v3 t : transactions) {
+        // Assume dbt_ac & crdt_ac are ledger IDs (like 743, 752, etc.)
+        String dbtKey = String.valueOf(t.getDbt_ac());
+        String crdtKey = String.valueOf(t.getCrdt_ac());
+
+        String dbtTitle = ledgerIdToTitle.getOrDefault(dbtKey, "");
+        String crdtTitle = ledgerIdToTitle.getOrDefault(crdtKey, "");
+
+        logger.info("Processing txnId={}, dbtKey={}, crdtKey={}, dbtTitle={}, crdtTitle={}, amount={}",
+                t.getTranID(), dbtKey, crdtKey, dbtTitle, crdtTitle, t.getAmount());
+
+        // ✅ Match by ac_title == title
+        if (category.equals(dbtTitle) || category.equals(crdtTitle)) {
+            String ledgerId = category.equals(dbtTitle) ? dbtKey : crdtKey;
+            String ledgerName = ledgerIdToName.getOrDefault(ledgerId, ledgerId);
+
+            // Parse amount safely
+            double amount = 0.0;
+            try {
+                if (t.getAmount() != null) {
+                    amount = Double.parseDouble(t.getAmount());
+                }
+            } catch (NumberFormatException nfe) {
+                logger.warn("Unable to parse amount '{}' for txn {}", t.getAmount(), t.getTranID(), nfe);
             }
+
+            totalAmount += amount;
+
+            Map<String, Object> agg = aggregated.computeIfAbsent(ledgerId, k -> new HashMap<>());
+            agg.put("id", ledgerId);
+            agg.put("ledger_name", ledgerName);
+
+            // amount used inside lambda must be effectively final
+            final double amtForLambda = amount;
+            agg.compute("amount",
+                    (k, v) -> v == null ? amtForLambda : ((Double) v) + amtForLambda);
         }
-
-        List<Map<String, Object>> result = aggregated.values().stream()
-                .filter(m -> ((Double) m.get("amount")) != 0)
-                .collect(Collectors.toList());
-
-        if (!result.isEmpty()) {
-            result.get(0).put("branch", totalAmount);
-        } else {
-            logger.warn("No transactions found for title: {}, CompanyName: {}, CustId: {}", title, companyName, custId);
-            result.add(new HashMap<>(Map.of("id", "0", "ledger_name", "No Data", "amount", 0.0, "branch", 0.0)));
-        }
-
-        return result;
     }
+
+    List<Map<String, Object>> result = aggregated.values().stream()
+            .filter(m -> ((Double) m.getOrDefault("amount", 0.0)) != 0.0)
+            .collect(Collectors.toList());
+
+    if (!result.isEmpty()) {
+        // Your frontend reads `branch` as the total of the section
+        result.get(0).put("branch", totalAmount);
+    } else {
+        logger.warn("No transactions found for title: {}, CompanyName: {}, CustId: {}",
+                title, companyName, custId);
+        Map<String, Object> noData = new HashMap<>();
+        noData.put("id", "0");
+        noData.put("ledger_name", "No Data");
+        noData.put("amount", 0.0);
+        noData.put("branch", 0.0);
+        result.add(noData);
+    }
+
+    return result;
+}
+
 
     @GetMapping("/profit_loss_bn_date")
     public List<Map<String, Object>> profitLossBnDate(

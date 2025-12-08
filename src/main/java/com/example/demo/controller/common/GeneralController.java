@@ -370,6 +370,12 @@ public ResponseEntity<Object> profile_updates_new(@RequestBody MessageProfile ms
     profileRepo.save(p);
     return ResponseEntity.noContent().build();
 }
-
+    @GetMapping("/dayBookData")
+    public List<Account_transactions_v3> dayBookData(
+            @RequestParam(value = "CompanyName") String companyName,
+            @RequestParam(value = "CustId") String custId) {
+        logger.info("Fetching day book data for CompanyName: {}, CustId: {}", companyName, custId);
+        return transactionService.list_transactions();
+    }
 
 }
