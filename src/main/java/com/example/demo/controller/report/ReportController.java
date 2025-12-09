@@ -1,6 +1,8 @@
 package com.example.demo.controller.report;
 
 import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
+import java.time.format.DateTimeParseException;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -140,56 +142,151 @@ public List<Map<String, Object>> profitLoss(
     }
 
     return result;
+
+    
 }
 
 
-    @GetMapping("/profit_loss_bn_date")
-    public List<Map<String, Object>> profitLossBnDate(
-            @RequestParam("title") String title,
-            @RequestParam(value = "CompanyName", required = false) String companyName,
-            @RequestParam(value = "CustId", required = false) String custId,
-            @RequestParam(value = "start", required = false, defaultValue = "2022-04-01") String start,
-            @RequestParam(value = "end", required = false, defaultValue = "2025-09-17") String end) {
-        logger.info("Fetching profit/loss data between dates for title: {}, CompanyName: {}, CustId: {}, start: {}, end: {}",
-                title, companyName, custId, start, end);
-        validateDate(start, "start");
-        validateDate(end, "end");
-        String category = mapTitleToCategory(title);
-        List<Account_transactions_v3> transactions = transactionService.payment_bn_dates(start, end);
-        List<Account_ledger_v3> ledgers = ledgerService.list_ledgers();
-        Map<String, String> ledgerTitles = ledgers.stream()
-                .filter(l -> l.getAc_title() != null)
-                .collect(Collectors.toMap(Account_ledger_v3::getLedger_name, Account_ledger_v3::getAc_title, (v1, v2) -> v1));
+// Adjust the getter used here to the one your account-statement code uses
+private LocalDate extractTxDate(Account_transactions_v3 t) {
+    // Example: if you have something like "2025-11-19 13:50:00.131574" or "2025-11-19"
+    String raw = t.getTran_Date();  // TODO: replace getDate() with the correct method
 
-        Map<String, Map<String, Object>> aggregated = new HashMap<>();
-        double totalAmount = 0.0;
-        for (Account_transactions_v3 t : transactions) {
-            String dbtTitle = ledgerTitles.getOrDefault(t.getDbt_ac(), "");
-            String crdtTitle = ledgerTitles.getOrDefault(t.getCrdt_ac(), "");
-            if (category.equals(dbtTitle) || category.equals(crdtTitle)) {
-                String ledgerName = category.equals(dbtTitle) ? t.getDbt_ac() : t.getCrdt_ac();
-                double amount = t.getAmount() != null ? Double.parseDouble(t.getAmount()) : 0.0;
-                totalAmount += amount;
-                aggregated.computeIfAbsent(ledgerName, k -> new HashMap<>()).put("id", t.getTranID());
-                aggregated.get(ledgerName).put("ledger_name", ledgerName);
-                aggregated.get(ledgerName).compute("amount", (k, v) -> v == null ? amount : ((Double) v) + amount);
+    if (raw == null || raw.isBlank()) {
+        return null;
+    }
+
+    // If there's a time part, drop everything after the space
+    String datePart = raw.contains(" ") ? raw.substring(0, raw.indexOf(' ')) : raw;
+
+    try {
+        // Frontend sends "YYYY-MM-DD", so we parse that format
+        return LocalDate.parse(datePart, DateTimeFormatter.ISO_LOCAL_DATE);
+    } catch (DateTimeParseException e) {
+        logger.warn("bn_date: cannot parse date '{}' for txn {}", raw, t.getTranID(), e);
+        return null;
+    }
+}
+
+
+
+@GetMapping("/profit_loss_bn_date")
+public List<Map<String, Object>> profitLossBnDate(
+        @RequestParam("title") String title,
+        @RequestParam(value = "CompanyName", required = false) String companyName,
+        @RequestParam(value = "CustId", required = false) String custId,
+        @RequestParam("start") String start,
+        @RequestParam("end") String end) {
+
+    logger.info("Fetching profit/loss (bn_date) for title: {}, CompanyName: {}, CustId: {}, start: {}, end: {}",
+            title, companyName, custId, start, end);
+
+    // If you have these, keep them
+    // validateDate(start, "start");
+    // validateDate(end, "end");
+
+    LocalDate startDate = LocalDate.parse(start); // "2023-11-01"
+    LocalDate endDate   = LocalDate.parse(end);   // "2025-12-09"
+
+    // For P&L sections 6/7/8/9, category is just the title string
+    String category = title.trim();
+
+    // 1️⃣ Get the full transaction history (same as /profit_loss)
+    List<Account_transactions_v3> allTransactions = transactionService.list_all_transactions();
+    logger.debug("profit_loss_bn_date: total transactions before filtering = {}", allTransactions.size());
+
+    // 2️⃣ Filter by date range in Java
+    List<Account_transactions_v3> transactions = allTransactions.stream()
+            .filter(t -> {
+                LocalDate txDate = extractTxDate(t);
+                if (txDate == null) {
+                    return false;
+                }
+                boolean inRange = !txDate.isBefore(startDate) && !txDate.isAfter(endDate);
+                return inRange;
+            })
+            .toList();
+
+    logger.debug("profit_loss_bn_date: transactions between {} and {} = {}",
+            startDate, endDate, transactions.size());
+
+    // 3️⃣ Same ledger mapping & aggregation logic as /profit_loss
+    List<Account_ledger_v3> ledgers = ledgerService.list_ledgers();
+
+    // id -> ac_title ("6","7","8","9", etc.)
+    Map<String, String> ledgerIdToTitle = ledgers.stream()
+            .filter(l -> l.getAc_title() != null)
+            .collect(Collectors.toMap(
+                    l -> String.valueOf(l.getId()),
+                    l -> String.valueOf(l.getAc_title()),
+                    (v1, v2) -> v1
+            ));
+
+    // id -> ledger_name
+    Map<String, String> ledgerIdToName = ledgers.stream()
+            .collect(Collectors.toMap(
+                    l -> String.valueOf(l.getId()),
+                    Account_ledger_v3::getLedger_name,
+                    (v1, v2) -> v1
+            ));
+
+    Map<String, Map<String, Object>> aggregated = new HashMap<>();
+    double totalAmount = 0.0;
+
+    for (Account_transactions_v3 t : transactions) {
+        String dbtKey  = String.valueOf(t.getDbt_ac());
+        String crdtKey = String.valueOf(t.getCrdt_ac());
+
+        String dbtTitle = ledgerIdToTitle.getOrDefault(dbtKey, "");
+        String crdtTitle = ledgerIdToTitle.getOrDefault(crdtKey, "");
+
+        if (!category.equals(dbtTitle) && !category.equals(crdtTitle)) {
+            continue;
+        }
+
+        String ledgerId   = category.equals(dbtTitle) ? dbtKey : crdtKey;
+        String ledgerName = ledgerIdToName.getOrDefault(ledgerId, ledgerId);
+
+        double amount = 0.0;
+        if (t.getAmount() != null) {
+            try {
+                amount = Double.parseDouble(t.getAmount());
+            } catch (NumberFormatException nfe) {
+                logger.warn("Unable to parse amount '{}' for txn {}", t.getAmount(), t.getTranID(), nfe);
             }
         }
 
-        List<Map<String, Object>> result = aggregated.values().stream()
-                .filter(m -> ((Double) m.get("amount")) != 0)
-                .collect(Collectors.toList());
+        totalAmount += amount;
 
-        if (!result.isEmpty()) {
-            result.get(0).put("branch", totalAmount);
-        } else {
-            logger.warn("No transactions found for title: {}, CompanyName: {}, CustId: {}, start: {}, end: {}",
-                    title, companyName, custId, start, end);
-            result.add(new HashMap<>(Map.of("id", "0", "ledger_name", "No Data", "amount", 0.0, "branch", 0.0)));
-        }
+        Map<String, Object> agg = aggregated.computeIfAbsent(ledgerId, k -> new HashMap<>());
+        agg.put("id", ledgerId);
+        agg.put("ledger_name", ledgerName);
 
-        return result;
+        final double amtForLambda = amount;
+        agg.compute("amount",
+                (k, v) -> v == null ? amtForLambda : ((Double) v) + amtForLambda);
     }
+
+    List<Map<String, Object>> result = aggregated.values().stream()
+            .filter(m -> ((Double) m.getOrDefault("amount", 0.0)) != 0.0)
+            .collect(Collectors.toList());
+
+    if (!result.isEmpty()) {
+        result.get(0).put("branch", totalAmount);
+    } else {
+        logger.warn("No transactions found (bn_date) for title: {}, CompanyName: {}, CustId: {}, start: {}, end: {}",
+                title, companyName, custId, start, end);
+        Map<String, Object> noData = new HashMap<>();
+        noData.put("id", "0");
+        noData.put("ledger_name", "No Data");
+        noData.put("amount", 0.0);
+        noData.put("branch", 0.0);
+        result.add(noData);
+    }
+
+    return result;
+}
+
 
     @GetMapping("/balanceSheetProfitLossDataBnDates")
     public List<Map<String, Object>> balanceSheetProfitLossDataBnDates(
